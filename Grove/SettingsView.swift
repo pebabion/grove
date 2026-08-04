@@ -203,18 +203,30 @@ struct GeneralSettings: View {
       }
 
       Section {
-        TextField(
-          "Editor",
-          text: Binding(
-            get: { model.library.editor ?? "" },
+        ApplicationPicker(
+          title: "Open with",
+          fallback: "Finder",
+          path: Binding(
+            get: { model.library.editorPath },
             set: {
-              model.library.editor = $0.isEmpty ? nil : $0
+              model.library.editorPath = $0
               model.saveLibrary()
-            }),
-          prompt: Text("Zed")
+            })
         )
+        ApplicationPicker(
+          title: "Terminal",
+          fallback: "Terminal",
+          path: Binding(
+            get: { model.library.terminalPath },
+            set: {
+              model.library.terminalPath = $0
+              model.saveLibrary()
+            })
+        )
+      } header: {
+        Text("Opening")
       } footer: {
-        Text("Application name used by Open. Empty reveals in Finder instead.")
+        Text("The Open button hands the workspace folder to this application.")
           .font(.caption)
           .foregroundStyle(.secondary)
       }

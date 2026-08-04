@@ -64,6 +64,11 @@ final class AppModel {
   func load() async {
     toolPaths = await ToolPaths.discover()
     library = (try? store.load(RepoLibrary.self, from: GroveLocations.libraryFile)) ?? RepoLibrary()
+    // Turn an older "Zed" style name into the app it meant, so nobody has to
+    // pick their editor a second time.
+    let before = library
+    library.migrateEditorName()
+    if library != before { saveLibrary() }
     // Cached sizes only. Measuring walks every file and takes tens of seconds,
     // so it never happens without being asked for.
     sizes = (try? store.load(SizeCache.self, from: SizeCache.fileURL)) ?? SizeCache()
@@ -509,15 +514,27 @@ final class AppModel {
 
   // MARK: - Opening things
 
+  /// Name of the app the Open action will use, or nil when it reveals in Finder.
+  var editorName: String? {
+    library.editorPath.flatMap(Self.applicationName)
+  }
+
+  var terminalName: String {
+    library.terminalPath.flatMap(Self.applicationName) ?? "Terminal"
+  }
+
+  static func applicationName(_ path: String) -> String? {
+    guard FileManager.default.fileExists(atPath: path) else { return nil }
+    return (path as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
+  }
+
   func openInEditor(_ url: URL) {
-    guard let editor = library.editor, !editor.isEmpty else {
+    guard let path = library.editorPath, FileManager.default.fileExists(atPath: path) else {
+      // No editor chosen, or the chosen one has been moved or deleted.
       NSWorkspace.shared.activateFileViewerSelecting([url])
       return
     }
-    Task {
-      let shell = Shell(environment: toolPaths.processEnvironment())
-      _ = try? await shell.run("/usr/bin/open", ["-a", editor, url.path])
-    }
+    open(url, withApplicationAt: URL(filePath: path))
   }
 
   func revealInFinder(_ url: URL) {
@@ -525,9 +542,27 @@ final class AppModel {
   }
 
   func openInTerminal(_ url: URL) {
-    Task {
-      let shell = Shell(environment: toolPaths.processEnvironment())
-      _ = try? await shell.run("/usr/bin/open", ["-a", "Terminal", url.path])
+    let path = library.terminalPath ?? "/System/Applications/Utilities/Terminal.app"
+    guard FileManager.default.fileExists(atPath: path) else {
+      NSWorkspace.shared.activateFileViewerSelecting([url])
+      return
+    }
+    open(url, withApplicationAt: URL(filePath: path))
+  }
+
+  /// Hands `url` to a specific application, reporting a refusal rather than
+  /// swallowing it the way `open -a` did.
+  private func open(_ url: URL, withApplicationAt application: URL) {
+    NSWorkspace.shared.open(
+      [url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration()
+    ) { [weak self] _, error in
+      guard let error else { return }
+      Task { @MainActor in
+        self?.errorMessage =
+          "Could not open \(url.lastPathComponent) with "
+          + "\(application.deletingPathExtension().lastPathComponent): "
+          + error.localizedDescription
+      }
     }
   }
 

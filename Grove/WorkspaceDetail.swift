@@ -25,7 +25,8 @@ struct WorkspaceDetail: View {
         } label: {
           Label("Open", systemImage: "arrow.up.forward.app")
         }
-        .help(model.library.editor.map { "Open in \($0)" } ?? "Reveal in Finder")
+        .help(
+          model.editorName.map { "Open in \($0)" } ?? "Reveal in Finder — pick an app in Settings")
 
         Menu {
           WorkspaceActions(workspace: workspace)

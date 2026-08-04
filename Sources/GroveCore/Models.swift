@@ -58,8 +58,19 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// Where workspaces are created, e.g. `~/code/worktrees`.
   public var workspaceRoot: String
 
-  /// Application used by the "open workspace" action, by bundle id or name.
+  /// Application name typed into an earlier version of Settings. Read once to
+  /// find the app it meant, then left alone.
   public var editor: String?
+
+  /// Application the Open action hands a workspace to, as a path to the bundle.
+  ///
+  /// A path rather than a name: a name has to be guessed at by `open -a`, which
+  /// says nothing when the guess is wrong, and Grove could not show which app it
+  /// meant. Empty means reveal in Finder instead.
+  public var editorPath: String?
+
+  /// Application the "Open in Terminal" action uses. Empty means Terminal.
+  public var terminalPath: String?
 
   /// Prepended to generated branch names, e.g. `kelvin` gives `kelvin/thing`.
   public var branchPrefix: String?
@@ -68,12 +79,43 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     repos: [RepoEntry] = [],
     workspaceRoot: String = "~/worktrees",
     editor: String? = nil,
+    editorPath: String? = nil,
+    terminalPath: String? = nil,
     branchPrefix: String? = nil
   ) {
     self.repos = repos
     self.workspaceRoot = workspaceRoot
     self.editor = editor
+    self.editorPath = editorPath
+    self.terminalPath = terminalPath
     self.branchPrefix = branchPrefix
+  }
+
+  /// Resolves the older `editor` name to a bundle path, once.
+  ///
+  /// Settings used to take a name like "Zed" and pass it to `open -a`. Anyone
+  /// upgrading has that in their library and should not have to pick their editor
+  /// again.
+  public mutating func migrateEditorName(
+    lookup: (String) -> String? = RepoLibrary.applicationPath(named:)
+  ) {
+    guard editorPath == nil, let name = editor, !name.isEmpty else { return }
+    editorPath = lookup(name)
+    editor = nil
+  }
+
+  /// Where an application of that name lives, if it is installed.
+  public static func applicationPath(named name: String) -> String? {
+    let trimmed = name.hasSuffix(".app") ? String(name.dropLast(4)) : name
+    let roots = [
+      "/Applications", "/System/Applications",
+      (NSHomeDirectory() as NSString).appendingPathComponent("Applications"),
+    ]
+    for root in roots {
+      let candidate = "\(root)/\(trimmed).app"
+      if FileManager.default.fileExists(atPath: candidate) { return candidate }
+    }
+    return nil
   }
 
   /// The branch a workspace called `name` gets by default.

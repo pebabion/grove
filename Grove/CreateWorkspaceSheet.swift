@@ -7,9 +7,18 @@ struct CreateWorkspaceSheet: View {
 
   @State private var name = ""
   @State private var branch = ""
-  @State private var branchEdited = false
   @State private var link = ""
   @State private var chosen: Set<String> = []
+
+  /// The last branch Grove filled in by itself.
+  ///
+  /// The branch follows the name until it is edited by hand, and telling those
+  /// two apart needs this. An earlier version flipped an "edited" flag from the
+  /// branch field's own onChange, which its own programmatic updates then
+  /// tripped — so the branch froze after the first letter typed.
+  @State private var suggested = ""
+
+  private var branchEdited: Bool { branch != suggested }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -23,12 +32,22 @@ struct CreateWorkspaceSheet: View {
         Section {
           TextField("Name", text: $name, prompt: Text("Improve TiDB performance"))
             .onChange(of: name) { _, new in
-              if !branchEdited { branch = model.library.suggestedBranch(for: new) }
+              guard !branchEdited else { return }
+              suggested = model.library.suggestedBranch(for: new)
+              branch = suggested
             }
 
-          TextField("Branch", text: $branch, prompt: Text("branch for every repo"))
-            .font(.system(.body, design: .monospaced))
-            .onChange(of: branch) { _, _ in branchEdited = true }
+          // Kebab-cased as it is typed. Git rejects spaces outright, so leaving
+          // them for the create step to complain about would be unkind.
+          TextField(
+            "Branch",
+            text: Binding(
+              get: { branch },
+              set: { branch = WorkspaceNaming.branchName($0) }
+            ),
+            prompt: Text("branch for every repo")
+          )
+          .font(.system(.body, design: .monospaced))
 
           TextField("Link", text: $link, prompt: Text("optional — ticket, doc, PR"))
         } footer: {

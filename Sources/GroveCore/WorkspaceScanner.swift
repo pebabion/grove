@@ -20,6 +20,31 @@ public enum SelectionAfterRemoval {
 
 /// Turns a name into a directory-safe slug.
 public enum WorkspaceNaming {
+  /// Kebab-cases a branch name while leaving it typeable.
+  ///
+  /// Slashes survive, since branches are namespaced with them. Everything else
+  /// that is not a letter or digit becomes a single hyphen — spaces included,
+  /// which git will not accept at all. A trailing hyphen is kept rather than
+  /// trimmed: stripping it would fight anyone typing "scout-" before the next
+  /// word.
+  public static func branchName(_ raw: String) -> String {
+    var result = ""
+    var lastWasDash = false
+    for character in raw.lowercased() {
+      if character == "/" {
+        result.append(character)
+        lastWasDash = false
+      } else if character.isLetter || character.isNumber {
+        result.append(character)
+        lastWasDash = false
+      } else if !lastWasDash, !result.isEmpty, !result.hasSuffix("/") {
+        result.append("-")
+        lastWasDash = true
+      }
+    }
+    return result
+  }
+
   public static func slug(_ name: String) -> String {
     let lowered = name.lowercased()
     var result = ""
