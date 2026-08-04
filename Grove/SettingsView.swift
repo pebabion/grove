@@ -113,7 +113,7 @@ struct RepoEditor: View {
             .font(.system(.caption, design: .monospaced))
             .textSelection(.enabled)
         }
-        TextField("Base branch", text: binding(\.base))
+        TextField("Base branch", text: binding(\.base), prompt: Text("origin/main"))
           .font(.system(.body, design: .monospaced))
       } footer: {
         Text("New worktrees fork from this. Read from origin/HEAD when the repo was added.")
@@ -193,7 +193,8 @@ struct GeneralSettings: View {
             set: {
               model.library.branchPrefix = $0.isEmpty ? nil : $0
               model.saveLibrary()
-            })
+            }),
+          prompt: Text("Your name, or nothing")
         )
         .font(.system(.body, design: .monospaced))
       } footer: {

@@ -36,7 +36,7 @@ struct CreateWorkspaceSheet: View {
           // typing one looks like nothing happened until the next character
           // arrives. Growing from a fixed left edge makes the space visible as it
           // is typed.
-          TextField("Name", text: $name, prompt: Text("Improve TiDB performance"))
+          TextField("Name", text: $name, prompt: Text("What are you working on?"))
             .multilineTextAlignment(.leading)
 
           // Shows the name's suggestion until typed into, and exactly what was
@@ -56,12 +56,12 @@ struct CreateWorkspaceSheet: View {
                 branchOverride = typed
               }
             ),
-            prompt: Text("branch for every repo")
+            prompt: Text("Fills in from the name")
           )
           .font(.system(.body, design: .monospaced))
           .multilineTextAlignment(.leading)
 
-          TextField("Link", text: $link, prompt: Text("optional — ticket, doc, PR"))
+          TextField("Link", text: $link, prompt: Text("A ticket or doc, if there is one"))
             .multilineTextAlignment(.leading)
         } footer: {
           VStack(alignment: .leading, spacing: 2) {
