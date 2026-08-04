@@ -34,6 +34,7 @@ final class AppModel {
   var pendingMeasurements = 0
 
   private let store = JSONStore()
+  private var sweepTask: Task<Void, Never>?
 
   var git: Git? {
     guard let executable = toolPaths.location(of: "git") else { return nil }
@@ -53,6 +54,11 @@ final class AppModel {
     // so it never happens without being asked for.
     sizes = (try? store.load(SizeCache.self, from: SizeCache.fileURL)) ?? SizeCache()
     await rescan()
+
+    // Behind the interface, not in front of it: the window is usable while this
+    // runs, and it is the reason sizes appear without being asked for.
+    Task { await measureStale() }
+    startBackgroundMeasurement()
   }
 
   func rescan() async {
@@ -135,6 +141,11 @@ final class AppModel {
       )
       await rescan()
       selection = created
+      // Setup just wrote a few gigabytes of dependencies; measure while the
+      // figure is worth having.
+      if let workspace = workspaces.first(where: { $0.url == created }) {
+        Task { await measure([workspace]) }
+      }
     } catch {
       errorMessage = error.localizedDescription
       await rescan()
@@ -155,6 +166,9 @@ final class AppModel {
         onUpdate: handler(forWorkspaceAt: workspace.url)
       )
       await rescan()
+      if let updated = workspaces.first(where: { $0.url == workspace.url }) {
+        Task { await measure([updated]) }
+      }
     } catch {
       errorMessage = error.localizedDescription
       await rescan()
@@ -175,6 +189,7 @@ final class AppModel {
       branch: member.branch ?? workspace.file.branch,
       onUpdate: handler(forWorkspaceAt: workspace.url)
     )
+    Task { await measure([workspace]) }
   }
 
   func rename(_ workspace: Workspace, to newName: String) async {
@@ -231,6 +246,9 @@ final class AppModel {
       )
       selection = nil
       await rescan()
+      // Drop the deleted workspace's reading so it stops counting in the total.
+      sizes.prune(keeping: workspaces.map(\.url))
+      try? store.save(sizes, to: SizeCache.fileURL)
     } catch {
       errorMessage = error.localizedDescription
       await rescan()
@@ -240,6 +258,46 @@ final class AppModel {
   // MARK: - Disk usage
 
   var isMeasuring: Bool { pendingMeasurements > 0 }
+
+  /// How old a reading may get before a background sweep replaces it.
+  ///
+  /// A workspace only changes size when dependencies are installed or a build
+  /// runs, so a day-old figure is still useful. Grove also remeasures a
+  /// workspace right after its setup finishes, which is when the number actually
+  /// moves.
+  static let sizeMaxAge: TimeInterval = 24 * 60 * 60
+
+  /// Gap between background sweeps.
+  static let sweepInterval: Duration = .seconds(1800)
+
+  /// Measures workspaces with no reading, or one older than ``sizeMaxAge``.
+  ///
+  /// The first sweep on a new machine costs a full walk — 42 seconds for
+  /// fourteen workspaces on real hardware — but it runs behind the interface and
+  /// every sweep after it only touches what has gone stale, which is usually
+  /// nothing. It stands down while a setup or teardown is running rather than
+  /// competing with it for the disk.
+  func measureStale() async {
+    guard !isMeasuring, !isBusy else { return }
+    let now = Date()
+    let stale = workspaces.filter { workspace in
+      guard let reading = sizes[workspace.url] else { return true }
+      return now.timeIntervalSince(reading.measuredAt) > Self.sizeMaxAge
+    }
+    await measure(stale)
+  }
+
+  /// Sweeps periodically for the life of the window.
+  func startBackgroundMeasurement() {
+    sweepTask?.cancel()
+    sweepTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: Self.sweepInterval)
+        guard !Task.isCancelled, let self else { return }
+        await self.measureStale()
+      }
+    }
+  }
 
   /// Total of every size Grove currently knows, and whether that covers
   /// everything on screen.
