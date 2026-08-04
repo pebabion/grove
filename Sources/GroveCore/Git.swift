@@ -25,14 +25,17 @@ public struct WorktreeInfo: Sendable, Hashable {
 ///
 /// Grove never removes a worktree without showing this first. Checking only
 /// `git status` misses the cases that actually hurt: commits that exist on no
-/// remote, stashes made inside the worktree, and ignored-but-real files such as
-/// `.env.local` or a scratch SQL dump.
+/// remote, and ignored-but-real files such as `.env.local` or a scratch SQL dump.
+///
+/// Stashes are deliberately absent. `refs/stash` belongs to the clone and is
+/// shared by every worktree of it, so a stash made here is still there after the
+/// worktree goes — listing them raised an alarm about work that was never at
+/// risk.
 public struct WorktreeRisk: Sendable, Hashable {
   public var uncommittedFiles: [String] = []
   public var untrackedFiles: [String] = []
   public var ignoredFiles: [String] = []
   public var unpushedCommits: [String] = []
-  public var stashes: [String] = []
   /// `.env*` entries that are real files rather than symlinks into the source clone.
   public var unlinkedEnvFiles: [String] = []
   /// True when the branch is an ancestor of its comparison target.
@@ -40,7 +43,7 @@ public struct WorktreeRisk: Sendable, Hashable {
 
   public var isEmpty: Bool {
     uncommittedFiles.isEmpty && untrackedFiles.isEmpty && ignoredFiles.isEmpty
-      && unpushedCommits.isEmpty && stashes.isEmpty && unlinkedEnvFiles.isEmpty
+      && unpushedCommits.isEmpty && unlinkedEnvFiles.isEmpty
   }
 
   public init() {}
@@ -226,7 +229,12 @@ public struct Git: Sendable {
     return result.trimmedOutput.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
   }
 
-  public func stashes(worktree: URL) async throws -> [String] {
+  /// Stashes belonging to the clone this worktree came from.
+  ///
+  /// Not part of the teardown audit: `refs/stash` is shared across every
+  /// worktree of a repository and outlives any single one of them, so these are
+  /// never destroyed by removing a worktree.
+  public func clonewideStashes(worktree: URL) async throws -> [String] {
     let result = try await attempt(["-C", worktree.path, "stash", "list"])
     guard result.succeeded else { return [] }
     return result.trimmedOutput.split(separator: "\n").map(String.init).filter { !$0.isEmpty }

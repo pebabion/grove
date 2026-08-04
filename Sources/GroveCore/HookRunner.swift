@@ -60,7 +60,6 @@ public struct WorktreeAuditor: Sendable {
       risk.ignoredFiles = entries.ignored
     }
     risk.unpushedCommits = (try? await git.unpushedCommits(worktree: worktree)) ?? []
-    risk.stashes = (try? await git.stashes(worktree: worktree)) ?? []
     risk.unlinkedEnvFiles = Self.unlinkedEnvFiles(in: worktree)
 
     if let repo, let branch = try? await git.currentBranch(worktree: worktree) {

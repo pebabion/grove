@@ -161,7 +161,8 @@ struct WorkspaceRow: View {
       VStack(alignment: .leading, spacing: 3) {
         Text(workspace.name)
           .lineLimit(1)
-        HStack(spacing: 4) {
+        // No spacing: each swatch carries its own hover box, which supplies the gap.
+        HStack(spacing: 0) {
           ForEach(workspace.members) { member in
             RepoSwatch(repo: member.repoName, size: 7)
           }

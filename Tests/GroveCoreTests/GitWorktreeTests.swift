@@ -136,20 +136,36 @@ final class Sandbox {
   }
 
   /// A repository on `main` with one commit and a `.gitignore` covering `.env*`.
-  func makeRepository(named name: String) async throws -> URL {
+  ///
+  /// Pass `withRemote` for a bare origin with `main` pushed to it. Tests about
+  /// unpushed work need that: without a remote every commit ever made counts as
+  /// unpushed, which is true but is not the situation being tested.
+  func makeRepository(named name: String, withRemote: Bool = false) async throws -> URL {
     let repo = root.appending(path: "repos/\(name)")
     try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
 
     try await git.run(["-C", repo.path, "init", "-b", "main"])
-    try await git.run(["-C", repo.path, "config", "user.name", "Grove Tests"])
-    try await git.run(["-C", repo.path, "config", "user.email", "tests@grove.invalid"])
-    try await git.run(["-C", repo.path, "config", "commit.gpgsign", "false"])
+    try await configure(repo)
 
     try write("# \(name)\n", to: repo.appending(path: "README.md"))
     try write(".env*\n", to: repo.appending(path: ".gitignore"))
     try await commit(in: repo, message: "initial commit")
 
+    if withRemote {
+      let remote = root.appending(path: "remotes/\(name).git")
+      try FileManager.default.createDirectory(at: remote, withIntermediateDirectories: true)
+      try await git.run(["-C", remote.path, "init", "--bare", "-b", "main"])
+      try await git.run(["-C", repo.path, "remote", "add", "origin", remote.path])
+      try await git.run(["-C", repo.path, "push", "-q", "-u", "origin", "main"])
+    }
+
     return repo
+  }
+
+  private func configure(_ repo: URL) async throws {
+    try await git.run(["-C", repo.path, "config", "user.name", "Grove Tests"])
+    try await git.run(["-C", repo.path, "config", "user.email", "tests@grove.invalid"])
+    try await git.run(["-C", repo.path, "config", "commit.gpgsign", "false"])
   }
 
   func commit(in worktree: URL, message: String) async throws {

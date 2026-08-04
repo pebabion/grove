@@ -21,8 +21,9 @@ Teardown is its mirror image and undoes anything setup did outside the worktree.
 Each becomes a worktree on a shared branch inside the workspace folder.
 
 **Teardown.** Grove shows exactly what a workspace is about to lose — unpushed
-commits, stashes, ignored-but-real files like `.env.local` — before removing
-anything.
+commits, ignored-but-real files like `.env.local` — before removing anything.
+Everything it lists is something that will be gone afterwards, so the list stays
+worth reading.
 
 The filesystem stays the source of truth. `git worktree list` and each
 workspace's `grove.json` describe reality; Grove's own store holds the library

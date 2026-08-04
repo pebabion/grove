@@ -45,7 +45,16 @@ test because it lives in a view, move it.
 
 Anything that removes a worktree goes through a `WorktreeRisk` audit first, and
 the result gets shown to the user. `git status` alone is not enough — it misses
-unpushed commits, stashes, and ignored-but-real files such as `.env.local`.
+unpushed commits and ignored-but-real files such as `.env.local`.
+
+**Do not add stashes to the audit.** `refs/stash` belongs to the clone and is
+shared by every worktree of it, so a stash outlives any worktree it was made in.
+Listing them showed a red nine-item warning about work that was never at risk.
+`Git.clonewideStashes` exists and is named to say so.
+
+Over-warning is a failure of its own. An alarm that fires on safe things teaches
+people to click through the one that matters, so every entry in the audit must be
+something that is genuinely gone afterwards.
 
 ## Tests
 

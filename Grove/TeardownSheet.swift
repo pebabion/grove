@@ -3,9 +3,12 @@ import SwiftUI
 
 /// Shows exactly what is about to be destroyed before destroying it.
 ///
-/// `git status` alone would call most of these worktrees clean. Unpushed
-/// commits, stashes and ignored-but-real files like `.env.local` are the ones
-/// that hurt, so they get listed by name.
+/// Everything listed is something that exists now and will be gone afterwards.
+/// Nothing here describes an action Grove takes to save your work.
+///
+/// `git status` alone would call most of these worktrees clean. Unpushed commits
+/// and ignored-but-real files like `.env.local` are the ones that hurt, so they
+/// get listed by name.
 struct TeardownSheet: View {
   @Environment(AppModel.self) private var model
   @Environment(\.dismiss) private var dismiss
@@ -40,6 +43,9 @@ struct TeardownSheet: View {
       } else {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
+            Text("Everything below exists now and will be gone afterwards.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
             ForEach(members, id: \.repoName) { member in
               riskCard(for: member)
             }
@@ -138,7 +144,6 @@ struct TeardownSheet: View {
           group("Commits on no remote", risk.unpushedCommits, tint: .red)
           group("Uncommitted changes", risk.uncommittedFiles, tint: .orange)
           group("Untracked files", risk.untrackedFiles, tint: .orange)
-          group("Stashes", risk.stashes, tint: .red)
           group("Real .env files, not symlinks", risk.unlinkedEnvFiles, tint: .red)
           group("Ignored files", risk.ignoredFiles, tint: .secondary)
         }

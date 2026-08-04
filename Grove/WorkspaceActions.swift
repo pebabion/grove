@@ -56,12 +56,13 @@ struct RepoSwatch: View {
     RoundedRectangle(cornerRadius: size / 3)
       .fill(RepoPalette.color(slot: model.library.colorIndex(for: repo)))
       .frame(width: size, height: size)
-      // The dot is 7pt in the sidebar, too small to hover on purpose. Grow the
-      // hit area, then take the space back so nothing shifts.
-      .padding(4)
+      // A real box around the dot, because the dot alone is too small to hover
+      // on purpose. Padding it and then applying negative padding does not
+      // work: hit testing is clipped to the layout frame, so the wider
+      // contentShape gets thrown away again.
+      .frame(width: size + 6, height: size + 6)
       .contentShape(Rectangle())
-      .padding(-4)
-      .help(tooltip)
+      .overlay(TooltipArea(text: tooltip))
   }
 
   private var tooltip: String {
