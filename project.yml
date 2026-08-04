@@ -36,13 +36,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pebabion.Grove
         PRODUCT_NAME: Grove
-        MARKETING_VERSION: "0.1.0"
+        MARKETING_VERSION: "0.2.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
         ENABLE_HARDENED_RUNTIME: YES
         # No App Sandbox. Grove spawns git, gh and per-repo setup scripts, and
         # reads repositories anywhere on disk. A sandbox cannot express that, so
-        # distribution is a notarized DMG rather than the App Store.
+        # distribution is a signed DMG rather than the App Store.
         ENABLE_APP_SANDBOX: NO
         CODE_SIGN_STYLE: Automatic
         DEAD_CODE_STRIPPING: YES

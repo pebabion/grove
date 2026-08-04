@@ -18,6 +18,10 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Tags and history, so the notes can list what changed since the last
+          # release. The default shallow clone knows of no previous tag.
+          fetch-depth: 0
 
       - name: Work out the version
         id: version
@@ -89,16 +93,36 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          cat > notes.md <<'NOTES'
+          # Everything since the previous tag, so a release says what it changed
+          # rather than only how to install it.
+          previous=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$previous" ]; then
+              git log --reverse --pretty='- %s' "$previous..$GITHUB_REF_NAME"
+              echo
+              echo "[Full diff](https://github.com/${GITHUB_REPOSITORY}/compare/$previous...$GITHUB_REF_NAME)"
+            else
+              echo "- First release."
+            fi
+            cat <<'NOTES'
+
           ## Installing
 
-          This build is ad-hoc signed, not notarised, so Gatekeeper will block the
-          first launch. Right-click the app and choose Open, or:
+          Drag Grove to Applications. It updates itself after that: a pill appears
+          when a newer release exists and one click installs it.
+
+          Builds are ad-hoc signed, not notarised, so Gatekeeper blocks the first
+          launch. Right-click Grove and choose Open, or:
 
           ```
           xattr -dr com.apple.quarantine /Applications/Grove.app
           ```
           NOTES
+          } > notes.md
+          cat notes.md
+
           gh release create "$GITHUB_REF_NAME" \
             --title "Grove $VERSION" \
             --notes-file notes.md \
