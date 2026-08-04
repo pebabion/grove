@@ -1,13 +1,31 @@
 # Grove
 
+[![CI](https://github.com/pebabion/grove/actions/workflows/ci.yml/badge.svg)](https://github.com/pebabion/grove/actions/workflows/ci.yml)
+
 A macOS app for multi-repo worktree workspaces.
 
 One task usually spans more than one repository. Grove creates a **workspace** —
 a folder holding a git worktree from each repo you need, all on the same branch —
 sets each one up, and tears the whole thing down when the work is done.
 
-Successor to [`cwt`](https://github.com/pebabion/cwt), rebuilt native and
+Successor to a Go CLI called `cwt`, rebuilt native and
 without its Linear and VS Code coupling.
+
+## Install
+
+Download the latest DMG from [Releases](https://github.com/pebabion/grove/releases/latest),
+open it and drag Grove to Applications.
+
+The build is signed ad-hoc rather than notarised, so Gatekeeper blocks the first
+launch. Right-click Grove and choose Open, or:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Grove.app
+```
+
+Grove spawns `git`, `gh` and each repo's own setup scripts, and reads
+repositories anywhere on disk. No App Sandbox can describe that, so it will
+never ship through the App Store.
 
 ## Model
 
