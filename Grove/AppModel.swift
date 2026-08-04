@@ -40,6 +40,7 @@ final class AppModel {
   /// A newer release than this build, once one is known.
   var availableUpdate: AvailableUpdate?
   var isDownloadingUpdate = false
+  var updateStage: UpdateStage?
 
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
@@ -292,13 +293,22 @@ final class AppModel {
     availableUpdate = await UpdateChecker().check(against: currentVersion)
   }
 
-  /// Fetches the new release's disk image and opens it, leaving the last step —
-  /// dragging Grove to Applications — to the user.
+  /// What the update is doing, for the pill to say.
+  enum UpdateStage: String, Sendable {
+    case downloading = "Downloading"
+    case verifying = "Verifying"
+    case installing = "Installing"
+    case restarting = "Restarting"
+  }
+
+  /// Downloads the release, checks it, swaps this app for it and relaunches.
   ///
-  /// Replacing a running app in place is possible but needs the update to be
-  /// notarised to be worth trusting, and this build is only ad-hoc signed. Until
-  /// then, opening the image is honest about what is happening.
-  func downloadUpdate() async {
+  /// Nothing installed is touched until the replacement is in hand: the download
+  /// is checked against the published digest, the new bundle is copied out of the
+  /// image and its signature verified, and only then is the swap handed to a
+  /// script that waits for this process to exit. If that move fails the script
+  /// puts the working copy back.
+  func installUpdate() async {
     guard let update = availableUpdate, !isDownloadingUpdate else { return }
     guard let downloadURL = update.downloadURL else {
       NSWorkspace.shared.open(update.pageURL)
@@ -306,27 +316,54 @@ final class AppModel {
     }
 
     isDownloadingUpdate = true
-    defer { isDownloadingUpdate = false }
+    updateStage = .downloading
+    defer {
+      isDownloadingUpdate = false
+      updateStage = nil
+    }
 
+    let updater = Updater(environment: toolPaths.processEnvironment())
     do {
       let (temporary, _) = try await URLSession.shared.download(from: downloadURL)
-      let destination =
-        FileManager.default
-        .urls(for: .downloadsDirectory, in: .userDomainMask).first?
+      let image = FileManager.default.temporaryDirectory
         .appending(path: downloadURL.lastPathComponent)
-        ?? FileManager.default.temporaryDirectory
-        .appending(path: downloadURL.lastPathComponent)
+      try? FileManager.default.removeItem(at: image)
+      try FileManager.default.moveItem(at: temporary, to: image)
 
-      if FileManager.default.fileExists(atPath: destination.path) {
-        try FileManager.default.removeItem(at: destination)
+      updateStage = .verifying
+      if let checksumsURL = update.checksumsURL,
+        let list = try? await fetchText(checksumsURL),
+        let expected = Updater.expectedChecksum(for: image.lastPathComponent, in: list)
+      {
+        try await updater.verify(image, matches: expected)
       }
-      try FileManager.default.moveItem(at: temporary, to: destination)
-      NSWorkspace.shared.open(destination)
+
+      updateStage = .installing
+      let staged = try await updater.stageApplication(fromImageAt: image)
+      let script = try updater.writeSwapScript(
+        staged: staged,
+        target: Bundle.main.bundleURL,
+        processIdentifier: ProcessInfo.processInfo.processIdentifier
+      )
+
+      updateStage = .restarting
+      try updater.launchDetached(script)
+      try? FileManager.default.removeItem(at: image)
+      // The script cannot move the bundle until this process is gone, so
+      // quitting is the final step of the install rather than a side effect.
+      NSApp.terminate(nil)
     } catch {
-      // Fall back to the release page rather than leaving the click doing nothing.
-      errorMessage = "Could not download the update: \(error.localizedDescription)"
+      errorMessage =
+        "\(error.localizedDescription)\n\nThe installed copy has not been touched."
       NSWorkspace.shared.open(update.pageURL)
     }
+  }
+
+  private func fetchText(_ url: URL) async throws -> String {
+    var request = URLRequest(url: url)
+    request.timeoutInterval = 15
+    let (data, _) = try await URLSession.shared.data(for: request)
+    return String(decoding: data, as: UTF8.self)
   }
 
   // MARK: - Pull requests

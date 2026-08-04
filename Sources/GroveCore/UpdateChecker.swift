@@ -60,14 +60,18 @@ public struct AvailableUpdate: Sendable, Hashable {
   public let pageURL: URL
   /// The disk image, when the release has one.
   public let downloadURL: URL?
+  /// The published SHA-256 list, used to check the download arrived whole.
+  public let checksumsURL: URL?
   public let publishedAt: Date?
 
   public init(
-    version: SemanticVersion, pageURL: URL, downloadURL: URL?, publishedAt: Date?
+    version: SemanticVersion, pageURL: URL, downloadURL: URL?, checksumsURL: URL? = nil,
+    publishedAt: Date?
   ) {
     self.version = version
     self.pageURL = pageURL
     self.downloadURL = downloadURL
+    self.checksumsURL = checksumsURL
     self.publishedAt = publishedAt
   }
 }
@@ -105,11 +109,15 @@ public struct UpdateChecker: Sendable {
     let dmg = release.assets
       .first { $0.name.hasSuffix(".dmg") }
       .flatMap { URL(string: $0.browserDownloadURL) }
+    let checksums = release.assets
+      .first { $0.name == "checksums.txt" }
+      .flatMap { URL(string: $0.browserDownloadURL) }
 
     return AvailableUpdate(
       version: latest,
       pageURL: page,
       downloadURL: dmg,
+      checksumsURL: checksums,
       publishedAt: release.publishedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
     )
   }

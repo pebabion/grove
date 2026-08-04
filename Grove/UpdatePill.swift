@@ -11,7 +11,7 @@ struct UpdatePill: View {
 
   var body: some View {
     Button {
-      Task { await model.downloadUpdate() }
+      Task { await model.installUpdate() }
     } label: {
       HStack(spacing: 6) {
         if model.isDownloadingUpdate {
@@ -21,12 +21,8 @@ struct UpdatePill: View {
         } else {
           Image(systemName: "shippingbox.fill")
         }
-        Text(
-          model.isDownloadingUpdate
-            ? "Downloading \(update.version.description)…"
-            : "Update Available: \(update.version.description)"
-        )
-        .fontWeight(.medium)
+        Text(label)
+          .fontWeight(.medium)
       }
       .font(.caption)
       .foregroundStyle(.white)
@@ -36,10 +32,19 @@ struct UpdatePill: View {
     }
     .buttonStyle(.plain)
     .disabled(model.isDownloadingUpdate)
-    .help("Running \(model.currentVersion) · downloads the disk image")
+    .help("Running \(model.currentVersion) · installs \(update.version) and restarts")
     .contextMenu {
       Link("What's new in \(update.version.description)", destination: update.pageURL)
       Button("Dismiss") { model.availableUpdate = nil }
     }
+  }
+
+  /// Names the step in progress, so a pause during verify or install does not
+  /// look like nothing happening.
+  private var label: String {
+    if let stage = model.updateStage {
+      return "\(stage.rawValue) \(update.version.description)…"
+    }
+    return "Update Available: \(update.version.description)"
   }
 }
