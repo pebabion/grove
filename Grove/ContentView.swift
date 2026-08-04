@@ -108,7 +108,22 @@ struct ContentView: View {
       }
     }
     .safeAreaInset(edge: .bottom) {
-      HStack(spacing: 6) {
+      VStack(alignment: .leading, spacing: 8) {
+        if let update = model.availableUpdate {
+          UpdatePill(update: update)
+        }
+        footer
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(.bar)
+    }
+  }
+
+  private var footer: some View {
+    HStack(spacing: 6) {
+      Group {
         if model.isScanning {
           ProgressView().controlSize(.small)
           Text("Scanning…")
@@ -118,18 +133,15 @@ struct ContentView: View {
         } else {
           diskFooter
         }
-        Spacer()
-        SettingsLink {
-          Image(systemName: "gearshape")
-        }
-        .buttonStyle(.borderless)
       }
-      .font(.caption)
-      .foregroundStyle(.secondary)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .background(.bar)
+      Spacer()
+      SettingsLink {
+        Image(systemName: "gearshape")
+      }
+      .buttonStyle(.borderless)
     }
+    .font(.caption)
+    .foregroundStyle(.secondary)
   }
 
   /// Either the measured total or an invitation to measure. Walking every file

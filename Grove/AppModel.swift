@@ -37,6 +37,10 @@ final class AppModel {
   var pullRequests = PullRequestCache()
   var isLoadingPullRequests = false
 
+  /// A newer release than this build, once one is known.
+  var availableUpdate: AvailableUpdate?
+  var isDownloadingUpdate = false
+
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
 
@@ -71,6 +75,7 @@ final class AppModel {
     // runs, and it is the reason sizes appear without being asked for.
     Task { await measureStale() }
     Task { await refreshPullRequests() }
+    Task { await checkForUpdate() }
     startBackgroundMeasurement()
   }
 
@@ -276,6 +281,54 @@ final class AppModel {
     }
   }
 
+  // MARK: - Updates
+
+  /// This build's version, from the bundle.
+  var currentVersion: String {
+    Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+  }
+
+  func checkForUpdate() async {
+    availableUpdate = await UpdateChecker().check(against: currentVersion)
+  }
+
+  /// Fetches the new release's disk image and opens it, leaving the last step —
+  /// dragging Grove to Applications — to the user.
+  ///
+  /// Replacing a running app in place is possible but needs the update to be
+  /// notarised to be worth trusting, and this build is only ad-hoc signed. Until
+  /// then, opening the image is honest about what is happening.
+  func downloadUpdate() async {
+    guard let update = availableUpdate, !isDownloadingUpdate else { return }
+    guard let downloadURL = update.downloadURL else {
+      NSWorkspace.shared.open(update.pageURL)
+      return
+    }
+
+    isDownloadingUpdate = true
+    defer { isDownloadingUpdate = false }
+
+    do {
+      let (temporary, _) = try await URLSession.shared.download(from: downloadURL)
+      let destination =
+        FileManager.default
+        .urls(for: .downloadsDirectory, in: .userDomainMask).first?
+        .appending(path: downloadURL.lastPathComponent)
+        ?? FileManager.default.temporaryDirectory
+        .appending(path: downloadURL.lastPathComponent)
+
+      if FileManager.default.fileExists(atPath: destination.path) {
+        try FileManager.default.removeItem(at: destination)
+      }
+      try FileManager.default.moveItem(at: temporary, to: destination)
+      NSWorkspace.shared.open(destination)
+    } catch {
+      // Fall back to the release page rather than leaving the click doing nothing.
+      errorMessage = "Could not download the update: \(error.localizedDescription)"
+      NSWorkspace.shared.open(update.pageURL)
+    }
+  }
+
   // MARK: - Pull requests
 
   func pullRequest(for member: WorkspaceMember) -> PullRequestReading? {
@@ -374,10 +427,15 @@ final class AppModel {
   func startBackgroundMeasurement() {
     sweepTask?.cancel()
     sweepTask = Task { [weak self] in
+      var sweeps = 0
       while !Task.isCancelled {
         try? await Task.sleep(for: Self.sweepInterval)
         guard !Task.isCancelled, let self else { return }
         await self.measureStale()
+        // Every twelfth sweep is roughly six hours. Releases are not frequent
+        // enough to justify asking more often than that.
+        sweeps += 1
+        if sweeps % 12 == 0 { await self.checkForUpdate() }
       }
     }
   }
