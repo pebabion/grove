@@ -87,6 +87,9 @@ struct WorkspaceActions: View {
     Divider()
 
     Button("Rename…") { model.renameTarget = workspace }
+    Button(model.sizes[workspace.url] == nil ? "Measure Disk Usage" : "Measure Again") {
+      Task { await model.measure([workspace]) }
+    }
 
     let present = Set(workspace.members.map(\.repoName))
     let available = model.library.repos.filter { !present.contains($0.name) }

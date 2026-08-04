@@ -29,6 +29,10 @@ final class AppModel {
   var renameTarget: Workspace?
   var teardownTarget: TeardownTarget?
 
+  /// Cached workspace sizes, and how many are still being measured.
+  var sizes = SizeCache()
+  var pendingMeasurements = 0
+
   private let store = JSONStore()
 
   var git: Git? {
@@ -45,6 +49,9 @@ final class AppModel {
   func load() async {
     toolPaths = await ToolPaths.discover()
     library = (try? store.load(RepoLibrary.self, from: GroveLocations.libraryFile)) ?? RepoLibrary()
+    // Cached sizes only. Measuring walks every file and takes tens of seconds,
+    // so it never happens without being asked for.
+    sizes = (try? store.load(SizeCache.self, from: SizeCache.fileURL)) ?? SizeCache()
     await rescan()
   }
 
@@ -228,6 +235,40 @@ final class AppModel {
       errorMessage = error.localizedDescription
       await rescan()
     }
+  }
+
+  // MARK: - Disk usage
+
+  var isMeasuring: Bool { pendingMeasurements > 0 }
+
+  /// Total of every size Grove currently knows, and whether that covers
+  /// everything on screen.
+  var knownTotal: (bytes: Int64, complete: Bool) {
+    let readings = workspaces.compactMap { sizes[$0.url]?.bytes }
+    return (readings.reduce(0, +), readings.count == workspaces.count)
+  }
+
+  /// Measures the given workspaces, filling sizes in as each finishes.
+  func measure(_ targets: [Workspace]) async {
+    guard !targets.isEmpty else { return }
+    let urls = targets.map(\.url)
+    pendingMeasurements += urls.count
+
+    await DiskUsage(environment: toolPaths.processEnvironment())
+      .measureAll(urls) { url, reading in
+        Task { @MainActor [weak self] in
+          guard let self else { return }
+          if let reading { sizes[url] = reading }
+          pendingMeasurements = max(0, pendingMeasurements - 1)
+        }
+      }
+
+    sizes.prune(keeping: workspaces.map(\.url))
+    try? store.save(sizes, to: SizeCache.fileURL)
+  }
+
+  func measureAll() async {
+    await measure(workspaces)
   }
 
   // MARK: - Opening things

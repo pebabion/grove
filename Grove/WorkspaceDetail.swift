@@ -48,10 +48,25 @@ struct WorkspaceDetail: View {
             .textSelection(.enabled)
         }
       }
-      Text(workspace.url.path)
-        .font(.system(.caption, design: .monospaced))
-        .foregroundStyle(.tertiary)
-        .textSelection(.enabled)
+      HStack(spacing: 6) {
+        Text(workspace.url.path)
+          .font(.system(.caption, design: .monospaced))
+          .foregroundStyle(.tertiary)
+          .textSelection(.enabled)
+
+        if let size = model.sizes[workspace.url] {
+          Text("· \(size.formatted) on disk")
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .help("Measured \(size.measuredAt.formatted(.relative(presentation: .named)))")
+        } else if !model.isMeasuring {
+          Button("measure size") {
+            Task { await model.measure([workspace]) }
+          }
+          .buttonStyle(.link)
+          .font(.caption)
+        }
+      }
     }
   }
 

@@ -89,10 +89,11 @@ struct ContentView: View {
         if model.isScanning {
           ProgressView().controlSize(.small)
           Text("Scanning…")
+        } else if model.isMeasuring {
+          ProgressView().controlSize(.small)
+          Text("Measuring… \(model.pendingMeasurements) left")
         } else {
-          Text(model.library.workspaceRoot)
-            .lineLimit(1)
-            .truncationMode(.head)
+          diskFooter
         }
         Spacer()
         SettingsLink {
@@ -105,6 +106,37 @@ struct ContentView: View {
       .padding(.horizontal, 12)
       .padding(.vertical, 8)
       .background(.bar)
+    }
+  }
+
+  /// Either the measured total or an invitation to measure. Walking every file
+  /// takes tens of seconds, so it is a button rather than something that happens
+  /// by itself.
+  @ViewBuilder
+  private var diskFooter: some View {
+    let total = model.knownTotal
+    if total.bytes > 0 {
+      Button {
+        Task { await model.measureAll() }
+      } label: {
+        Text(
+          total.complete
+            ? total.bytes.formatted(.byteCount(style: .file))
+            : "\(total.bytes.formatted(.byteCount(style: .file)))+ measured"
+        )
+      }
+      .buttonStyle(.borderless)
+      .help("Measure disk usage again")
+    } else if !model.workspaces.isEmpty {
+      Button("Measure disk usage") {
+        Task { await model.measureAll() }
+      }
+      .buttonStyle(.borderless)
+      .help("Walks every file, which takes a while")
+    } else {
+      Text(model.library.workspaceRoot)
+        .lineLimit(1)
+        .truncationMode(.head)
     }
   }
 
@@ -154,6 +186,7 @@ struct ContentView: View {
 /// The dots are the workspace's repos, one colour each, so its make-up reads at
 /// a glance without opening it.
 struct WorkspaceRow: View {
+  @Environment(AppModel.self) private var model
   let workspace: Workspace
 
   var body: some View {
@@ -180,6 +213,12 @@ struct WorkspaceRow: View {
         Image(systemName: "pencil.circle.fill")
           .foregroundStyle(.orange)
           .help("Uncommitted changes")
+      }
+      if let size = model.sizes[workspace.url] {
+        Text(size.formatted)
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.secondary)
+          .help("Measured \(size.measuredAt.formatted(.relative(presentation: .named)))")
       }
     }
     .padding(.vertical, 2)
