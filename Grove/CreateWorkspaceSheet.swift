@@ -37,27 +37,27 @@ struct CreateWorkspaceSheet: View {
               branch = suggested
             }
 
-          // Kebab-cased as it is typed. Git rejects spaces outright, so leaving
-          // them for the create step to complain about would be unkind.
-          TextField(
-            "Branch",
-            text: Binding(
-              get: { branch },
-              set: { branch = WorkspaceNaming.branchName($0) }
-            ),
-            prompt: Text("branch for every repo")
-          )
-          .font(.system(.body, design: .monospaced))
+          // Bound straight to the text. Rewriting it on every keystroke made a
+          // typed space look like it had done nothing until the next character
+          // arrived — the field keeps showing what was typed until something
+          // redraws it. Kebab-casing happens once, on Create, and the footer
+          // shows the result meanwhile.
+          TextField("Branch", text: $branch, prompt: Text("branch for every repo"))
+            .font(.system(.body, design: .monospaced))
 
           TextField("Link", text: $link, prompt: Text("optional — ticket, doc, PR"))
         } footer: {
-          if !name.isEmpty {
-            Text(
-              "\(model.library.workspaceRoot)/\(WorkspaceNaming.slug(name))"
-            )
-            .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(.secondary)
+          VStack(alignment: .leading, spacing: 2) {
+            if !name.isEmpty {
+              Text("\(model.library.workspaceRoot)/\(WorkspaceNaming.slug(name))")
+            }
+            // Only worth saying when it differs from what is typed.
+            if finalBranch != branch, !finalBranch.isEmpty {
+              Text("branch: \(finalBranch)")
+            }
           }
+          .font(.system(.caption, design: .monospaced))
+          .foregroundStyle(.secondary)
         }
 
         Section("Repos") {
@@ -89,7 +89,7 @@ struct CreateWorkspaceSheet: View {
         Button("Cancel") { dismiss() }
           .keyboardShortcut(.cancelAction)
         Button("Create") {
-          let request = (name, branch, link, chosen)
+          let request = (name, finalBranch, link, chosen)
           dismiss()
           Task {
             await model.createWorkspace(
@@ -105,10 +105,13 @@ struct CreateWorkspaceSheet: View {
     .frame(width: 480, height: 500)
   }
 
+  /// The branch that will actually be created.
+  private var finalBranch: String {
+    WorkspaceNaming.finalBranchName(branch)
+  }
+
   private var canCreate: Bool {
-    !WorkspaceNaming.slug(name).isEmpty
-      && !branch.trimmingCharacters(in: .whitespaces).isEmpty
-      && !chosen.isEmpty
+    !WorkspaceNaming.slug(name).isEmpty && !finalBranch.isEmpty && !chosen.isEmpty
   }
 
   private func binding(for repoName: String) -> Binding<Bool> {

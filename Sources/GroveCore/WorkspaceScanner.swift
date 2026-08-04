@@ -20,13 +20,14 @@ public enum SelectionAfterRemoval {
 
 /// Turns a name into a directory-safe slug.
 public enum WorkspaceNaming {
-  /// Kebab-cases a branch name while leaving it typeable.
+  /// Kebab-cases a branch name.
   ///
   /// Slashes survive, since branches are namespaced with them. Everything else
   /// that is not a letter or digit becomes a single hyphen — spaces included,
-  /// which git will not accept at all. A trailing hyphen is kept rather than
-  /// trimmed: stripping it would fight anyone typing "scout-" before the next
-  /// word.
+  /// which git will not accept at all.
+  ///
+  /// A trailing hyphen or slash is left in place, so this is safe to apply to
+  /// half-typed text. ``finalBranchName(_:)`` tidies those away.
   public static func branchName(_ raw: String) -> String {
     var result = ""
     var lastWasDash = false
@@ -43,6 +44,23 @@ public enum WorkspaceNaming {
       }
     }
     return result
+  }
+
+  /// The branch name to actually use: kebab-cased, with nothing dangling.
+  ///
+  /// Applied once, when the work is created, rather than to each keystroke.
+  /// Rewriting a `TextField`'s text as it is typed leaves the field showing the
+  /// old character until the next one arrives, so a typed space appeared to do
+  /// nothing until you typed again.
+  public static func finalBranchName(_ raw: String) -> String {
+    let kebab = branchName(raw)
+    let segments = kebab.split(separator: "/").map { segment -> String in
+      var part = String(segment)
+      while part.hasPrefix("-") { part.removeFirst() }
+      while part.hasSuffix("-") { part.removeLast() }
+      return part
+    }
+    return segments.filter { !$0.isEmpty }.joined(separator: "/")
   }
 
   public static func slug(_ name: String) -> String {

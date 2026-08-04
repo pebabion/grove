@@ -89,3 +89,37 @@ struct EditorSettingTests {
     #expect(RepoLibrary.applicationPath(named: "DefinitelyNotAnApp") == nil)
   }
 }
+
+@Suite("the branch actually created")
+struct FinalBranchTests {
+  @Test("kebab-cases and tidies what was typed")
+  func tidiesTypedText() {
+    #expect(WorkspaceNaming.finalBranchName("kelvin/Improve TiDB ") == "kelvin/improve-tidb")
+    #expect(WorkspaceNaming.finalBranchName("Fix The Thing") == "fix-the-thing")
+  }
+
+  @Test("drops dangling separators the typing rules allowed")
+  func dropsDanglingSeparators() {
+    // branchName keeps these so the field does not fight mid-word; this is where
+    // they go.
+    #expect(WorkspaceNaming.finalBranchName("kelvin/scout-") == "kelvin/scout")
+    #expect(WorkspaceNaming.finalBranchName("kelvin/") == "kelvin")
+    #expect(WorkspaceNaming.finalBranchName("kelvin//thing") == "kelvin/thing")
+    #expect(WorkspaceNaming.finalBranchName("-leading-") == "leading")
+  }
+
+  @Test("nothing typed means nothing to create")
+  func emptyStaysEmpty() {
+    #expect(WorkspaceNaming.finalBranchName("") == "")
+    #expect(WorkspaceNaming.finalBranchName("   ") == "")
+    #expect(WorkspaceNaming.finalBranchName("///") == "")
+  }
+
+  @Test("leaves an already-clean name alone")
+  func idempotent() {
+    let clean = "kelvin/improve-tidb-performance"
+
+    #expect(WorkspaceNaming.finalBranchName(clean) == clean)
+    #expect(WorkspaceNaming.finalBranchName(WorkspaceNaming.finalBranchName(clean)) == clean)
+  }
+}
