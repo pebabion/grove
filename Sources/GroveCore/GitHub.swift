@@ -42,11 +42,10 @@ public enum PullRequestLookup: Sendable, Hashable {
 /// Asks GitHub whether a branch has a pull request.
 ///
 /// One lookup per branch, rather than listing a repo's recent pull requests and
-/// matching. Listing looked cheaper but was measured wrong: `backend` is past
-/// PR #23,600, so the hundred most recent cover days, and eleven of eighteen
-/// live branches fell outside that window. Six of them did have pull requests.
-/// Targeted lookups found every one, and eleven of them took 1.7 seconds
-/// five-at-a-time.
+/// matching. Listing looked cheaper but was measured wrong: in a busy repository
+/// the hundred most recent pull requests span only days, and most live branches
+/// fell outside that window — several of which did have pull requests. Targeted
+/// lookups found every one, and eleven of them took 1.7 seconds five-at-a-time.
 public struct GitHub: Sendable {
   /// Simultaneous `gh` calls. Each is a network round trip, so this is about
   /// being a reasonable API client rather than saturating anything local.
