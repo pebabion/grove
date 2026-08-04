@@ -16,7 +16,7 @@ jobs:
     name: GroveCore
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Toolchain
         run: swift --version && xcodebuild -version
@@ -41,7 +41,7 @@ jobs:
     name: Grove.app
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -79,7 +79,7 @@ jobs:
     name: Icon is current
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Regenerate and compare
         # The icon is committed but generated. This catches a change to the
