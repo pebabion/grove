@@ -13,6 +13,15 @@ struct ContentView: View {
     } detail: {
       if let workspace = model.selectedWorkspace {
         WorkspaceDetail(workspace: workspace)
+      } else if model.isFirstScan {
+        // The first scan runs git in every worktree and takes seconds. Saying
+        // nothing here reads as an empty app rather than a busy one.
+        VStack(spacing: 10) {
+          ProgressView()
+          Text("Reading worktrees…")
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         emptyDetail
       }
@@ -38,6 +47,10 @@ struct ContentView: View {
         .disabled(model.isScanning)
       }
     }
+    // An explicit minimum is what lets the scene's .defaultSize take effect. With
+    // no frame here a NavigationSplitView reports its own size and the window
+    // adopts that instead, which is how .defaultSize came to be ignored.
+    .frame(minWidth: 900, minHeight: 600)
     .sheet(isPresented: $showingCreate) {
       CreateWorkspaceSheet()
     }
@@ -80,7 +93,16 @@ struct ContentView: View {
       }
     }
     .overlay {
-      if model.workspaces.isEmpty, !model.isScanning {
+      if model.isFirstScan {
+        VStack(spacing: 8) {
+          ProgressView().controlSize(.small)
+          Text("Scanning \(model.library.workspaceRoot)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+        }
+        .padding(24)
+      } else if model.workspaces.isEmpty {
         sidebarEmptyState
       }
     }
@@ -181,47 +203,58 @@ struct ContentView: View {
   }
 }
 
-/// One row in the workspace sidebar.
+/// One row in the workspace sidebar: the workspace, then a line per repo.
 ///
-/// The dots are the workspace's repos, one colour each, so its make-up reads at
-/// a glance without opening it.
+/// Repos are listed rather than reduced to a row of dots because they are often
+/// on different branches. A workspace holding four repos on four branches showed
+/// only one of them under the old layout, which was worse than showing none.
 struct WorkspaceRow: View {
   @Environment(AppModel.self) private var model
   let workspace: Workspace
 
   var body: some View {
-    HStack(spacing: 8) {
-      VStack(alignment: .leading, spacing: 3) {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 6) {
         Text(workspace.name)
           .lineLimit(1)
-        // No spacing: each swatch carries its own hover box, which supplies the gap.
-        HStack(spacing: 0) {
-          ForEach(workspace.members) { member in
+          .truncationMode(.tail)
+        Spacer(minLength: 6)
+        if let size = model.sizes[workspace.url] {
+          Text(size.formatted)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      if workspace.members.isEmpty {
+        Text(workspace.file.branch.isEmpty ? "no repos on disk" : workspace.file.branch)
+          .font(.caption)
+          .foregroundStyle(.tertiary)
+          .lineLimit(1)
+      } else {
+        ForEach(workspace.members) { member in
+          HStack(spacing: 5) {
             RepoSwatch(repo: member.repoName, size: 7)
-          }
-          if !workspace.file.branch.isEmpty {
-            Text(workspace.file.branch)
+            Text(member.repoName)
               .font(.caption)
               .foregroundStyle(.secondary)
+              .fixedSize()
+            // Branches share long prefixes, so keep the distinctive tail.
+            Text(member.branch ?? "detached")
+              .font(.system(.caption2, design: .monospaced))
+              .foregroundStyle(.tertiary)
               .lineLimit(1)
               .truncationMode(.head)
+            if member.hasUncommittedChanges {
+              Image(systemName: "pencil.circle.fill")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+            }
           }
         }
       }
-      Spacer()
-      if workspace.members.contains(where: \.hasUncommittedChanges) {
-        Image(systemName: "pencil.circle.fill")
-          .foregroundStyle(.orange)
-          .help("Uncommitted changes")
-      }
-      if let size = model.sizes[workspace.url] {
-        Text(size.formatted)
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
-          .help("Measured \(size.measuredAt.formatted(.relative(presentation: .named)))")
-      }
     }
-    .padding(.vertical, 2)
+    .padding(.vertical, 3)
   }
 }
 

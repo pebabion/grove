@@ -45,6 +45,11 @@ final class AppModel {
     workspaces.first { $0.url == selection }
   }
 
+  /// Scanning with nothing on screen yet, which is the case worth a spinner.
+  /// A rescan with workspaces already listed shows progress in the footer
+  /// instead, so the list does not flash empty.
+  var isFirstScan: Bool { isScanning && workspaces.isEmpty }
+
   // MARK: - Lifecycle
 
   func load() async {

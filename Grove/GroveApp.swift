@@ -11,7 +11,11 @@ struct GroveApp: App {
         .environment(model)
         .task { await model.load() }
     }
-    .defaultSize(width: 1000, height: 680)
+    // Applies on first launch only. After that macOS remembers whatever size the
+    // window was left at, so changing this does nothing to an existing install
+    // until the saved frame is cleared.
+    .defaultSize(width: 1440, height: 920)
+    .defaultPosition(.center)
     .commands {
       CommandGroup(replacing: .newItem) {
         Button("New Workspace…") {

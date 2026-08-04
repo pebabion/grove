@@ -55,9 +55,6 @@ struct RepoSwatch: View {
     RoundedRectangle(cornerRadius: size / 3)
       .fill(RepoPalette.color(slot: model.library.colorIndex(for: repo)))
       .frame(width: size, height: size)
-      // The outer frame supplies the gap between swatches, so rows of them use
-      // no spacing of their own.
-      .frame(width: size + 6, height: size + 6)
   }
 }
 
