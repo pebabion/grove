@@ -45,6 +45,17 @@ struct BranchNamingTests {
   func withoutPrefix() {
     #expect(RepoLibrary().suggestedBranch(for: "Some Work") == "some-work")
   }
+
+  @Test("no name means no branch, not a bare prefix")
+  func emptyNameSuggestsNothing() {
+    let library = RepoLibrary(branchPrefix: "kelvin")
+
+    // "kelvin/" here was shown by the create sheet and written back through the
+    // branch field's binding, which then stopped following the name entirely.
+    #expect(library.suggestedBranch(for: "") == "")
+    #expect(library.suggestedBranch(for: "   ") == "")
+    #expect(library.suggestedBranch(for: "!!!") == "")
+  }
 }
 
 @Suite("editor setting")

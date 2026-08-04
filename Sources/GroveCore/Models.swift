@@ -119,8 +119,13 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   }
 
   /// The branch a workspace called `name` gets by default.
+  ///
+  /// No name means no branch. Returning a bare prefix like `kelvin/` looked
+  /// harmless but was not: the create sheet showed it, the field wrote that value
+  /// back through its binding, and the branch stopped following the name.
   public func suggestedBranch(for name: String) -> String {
     let slug = WorkspaceNaming.slug(name)
+    guard !slug.isEmpty else { return "" }
     guard let prefix = branchPrefix?.trimmingCharacters(in: .whitespaces), !prefix.isEmpty else {
       return slug
     }

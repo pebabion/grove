@@ -44,7 +44,18 @@ struct CreateWorkspaceSheet: View {
           // rewriting the text on each keystroke left it a character behind.
           TextField(
             "Branch",
-            text: Binding(get: { branch }, set: { branchOverride = $0 }),
+            text: Binding(
+              get: { branch },
+              // Only a real change counts as typing. SwiftUI writes the field's
+              // current text back through the binding when it commits or loses
+              // focus, and taking that as an edit set the override to whatever was
+              // merely on display — after which the branch never followed the name
+              // again.
+              set: { typed in
+                guard typed != branch else { return }
+                branchOverride = typed
+              }
+            ),
             prompt: Text("branch for every repo")
           )
           .font(.system(.body, design: .monospaced))
