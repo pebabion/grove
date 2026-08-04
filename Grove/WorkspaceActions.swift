@@ -129,7 +129,7 @@ struct RenameSheet: View {
       Text("Rename Workspace")
         .font(.title3.weight(.semibold))
 
-      TextField("Name", text: $name, prompt: Text("What should it be called?"))
+      TextField("Name", text: $name, prompt: Text("Something you'll recognise in a week"))
         .textFieldStyle(.roundedBorder)
         .onSubmit { commit() }
 

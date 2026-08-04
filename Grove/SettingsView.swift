@@ -194,7 +194,7 @@ struct GeneralSettings: View {
               model.library.branchPrefix = $0.isEmpty ? nil : $0
               model.saveLibrary()
             }),
-          prompt: Text("Your name, or nothing")
+          prompt: Text("ada — or leave it empty")
         )
         .font(.system(.body, design: .monospaced))
       } footer: {

@@ -144,7 +144,7 @@ final class AppModel {
 
   // MARK: - Workspaces
 
-  func createWorkspace(name: String, branch: String, link: String?, repoNames: Set<String>) async {
+  func createWorkspace(name: String, branch: String, repoNames: Set<String>) async {
     guard let git else { return }
     let repos = library.repos.filter { repoNames.contains($0.name) }
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
@@ -158,7 +158,9 @@ final class AppModel {
       let created = try await service.create(
         name: name,
         branch: branch,
-        link: link?.isEmpty == true ? nil : link,
+        // A workspace can carry a link in its grove.json, but nothing in the
+        // interface collects one yet.
+        link: nil,
         repos: repos,
         in: root,
         onUpdate: handler(forWorkspaceAt: root.appending(path: WorkspaceNaming.slug(name)))

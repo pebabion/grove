@@ -6,7 +6,6 @@ struct CreateWorkspaceSheet: View {
   @Environment(\.dismiss) private var dismiss
 
   @State private var name = ""
-  @State private var link = ""
   @State private var chosen: Set<String> = []
 
   /// A branch typed by hand. `nil` means it follows the name.
@@ -20,6 +19,22 @@ struct CreateWorkspaceSheet: View {
   private var branch: String {
     branchOverride ?? model.library.suggestedBranch(for: name)
   }
+
+  /// Placeholder work, picked when the sheet opens.
+  ///
+  /// A concrete example teaches more than a question does: the name and the branch
+  /// below it show the same words, so the kebab-casing explains itself without a
+  /// caption saying so.
+  private static let examples = [
+    "Tame the flaky tests",
+    "Rip out the old cache",
+    "Make search fast again",
+    "Fix the Friday deploy",
+    "Teach billing about refunds",
+    "Stop the double emails",
+  ]
+
+  @State private var example = CreateWorkspaceSheet.examples.randomElement() ?? "Fix the thing"
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -36,12 +51,13 @@ struct CreateWorkspaceSheet: View {
           // typing one looks like nothing happened until the next character
           // arrives. Growing from a fixed left edge makes the space visible as it
           // is typed.
-          TextField("Name", text: $name, prompt: Text("What are you working on?"))
+          TextField("Name", text: $name, prompt: Text(example))
             .multilineTextAlignment(.leading)
 
-          // Shows the name's suggestion until typed into, and exactly what was
-          // typed after that. Kebab-casing happens once, on Create, because
-          // rewriting the text on each keystroke left it a character behind.
+          // Kebab-cased as it is typed. Safe here in a way it was not for the
+          // name: a space becomes a hyphen, which is a visible character, so it
+          // appears at once even though a grouped Form aligns the text right. A
+          // space typed into the name stays a space and has nothing to push.
           TextField(
             "Branch",
             text: Binding(
@@ -52,17 +68,15 @@ struct CreateWorkspaceSheet: View {
               // merely on display — after which the branch never followed the name
               // again.
               set: { typed in
-                guard typed != branch else { return }
-                branchOverride = typed
+                let cleaned = WorkspaceNaming.branchName(typed)
+                guard cleaned != branch else { return }
+                branchOverride = cleaned
               }
             ),
-            prompt: Text("Fills in from the name")
+            prompt: Text(model.library.suggestedBranch(for: example))
           )
           .font(.system(.body, design: .monospaced))
           .multilineTextAlignment(.leading)
-
-          TextField("Link", text: $link, prompt: Text("A ticket or doc, if there is one"))
-            .multilineTextAlignment(.leading)
         } footer: {
           VStack(alignment: .leading, spacing: 2) {
             if !name.isEmpty {
@@ -106,11 +120,11 @@ struct CreateWorkspaceSheet: View {
         Button("Cancel") { dismiss() }
           .keyboardShortcut(.cancelAction)
         Button("Create") {
-          let request = (name, finalBranch, link, chosen)
+          let request = (name, finalBranch, chosen)
           dismiss()
           Task {
             await model.createWorkspace(
-              name: request.0, branch: request.1, link: request.2, repoNames: request.3)
+              name: request.0, branch: request.1, repoNames: request.2)
           }
         }
         .keyboardShortcut(.defaultAction)
