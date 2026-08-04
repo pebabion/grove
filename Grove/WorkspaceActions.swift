@@ -44,9 +44,8 @@ enum RepoPalette {
   }
 }
 
-/// A repo's colour swatch, naming the repo on hover. Greys out for a worktree
-/// whose clone is not in the library, which is how an adopted stray reads as
-/// unmanaged.
+/// A repo's colour swatch. Greys out for a worktree whose clone is not in the
+/// library, which is how an adopted stray reads as unmanaged.
 struct RepoSwatch: View {
   @Environment(AppModel.self) private var model
   let repo: String
@@ -56,17 +55,9 @@ struct RepoSwatch: View {
     RoundedRectangle(cornerRadius: size / 3)
       .fill(RepoPalette.color(slot: model.library.colorIndex(for: repo)))
       .frame(width: size, height: size)
-      // A real box around the dot, because the dot alone is too small to hover
-      // on purpose. Padding it and then applying negative padding does not
-      // work: hit testing is clipped to the layout frame, so the wider
-      // contentShape gets thrown away again.
+      // The outer frame supplies the gap between swatches, so rows of them use
+      // no spacing of their own.
       .frame(width: size + 6, height: size + 6)
-      .contentShape(Rectangle())
-      .overlay(TooltipArea(text: tooltip))
-  }
-
-  private var tooltip: String {
-    model.library[repo] == nil ? "\(repo) — not in your repo library" : repo
   }
 }
 
