@@ -6,19 +6,20 @@ struct CreateWorkspaceSheet: View {
   @Environment(\.dismiss) private var dismiss
 
   @State private var name = ""
-  @State private var branch = ""
   @State private var link = ""
   @State private var chosen: Set<String> = []
 
-  /// The last branch Grove filled in by itself.
+  /// A branch typed by hand. `nil` means it follows the name.
   ///
-  /// The branch follows the name until it is edited by hand, and telling those
-  /// two apart needs this. An earlier version flipped an "edited" flag from the
-  /// branch field's own onChange, which its own programmatic updates then
-  /// tripped — so the branch froze after the first letter typed.
-  @State private var suggested = ""
+  /// Derived rather than stored, so typing the name writes one piece of state and
+  /// nothing else. Keeping the branch in its own `@State` meant every keystroke in
+  /// the name field wrote to it too, rebuilding the form mid-edit — which is why a
+  /// typed space did not appear until the next character.
+  @State private var branchOverride: String?
 
-  private var branchEdited: Bool { branch != suggested }
+  private var branch: String {
+    branchOverride ?? model.library.suggestedBranch(for: name)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -30,22 +31,27 @@ struct CreateWorkspaceSheet: View {
 
       Form {
         Section {
+          // Left-aligned. A grouped Form right-aligns its values, and in
+          // right-aligned text a trailing space has nothing after it to push, so
+          // typing one looks like nothing happened until the next character
+          // arrives. Growing from a fixed left edge makes the space visible as it
+          // is typed.
           TextField("Name", text: $name, prompt: Text("Improve TiDB performance"))
-            .onChange(of: name) { _, new in
-              guard !branchEdited else { return }
-              suggested = model.library.suggestedBranch(for: new)
-              branch = suggested
-            }
+            .multilineTextAlignment(.leading)
 
-          // Bound straight to the text. Rewriting it on every keystroke made a
-          // typed space look like it had done nothing until the next character
-          // arrived — the field keeps showing what was typed until something
-          // redraws it. Kebab-casing happens once, on Create, and the footer
-          // shows the result meanwhile.
-          TextField("Branch", text: $branch, prompt: Text("branch for every repo"))
-            .font(.system(.body, design: .monospaced))
+          // Shows the name's suggestion until typed into, and exactly what was
+          // typed after that. Kebab-casing happens once, on Create, because
+          // rewriting the text on each keystroke left it a character behind.
+          TextField(
+            "Branch",
+            text: Binding(get: { branch }, set: { branchOverride = $0 }),
+            prompt: Text("branch for every repo")
+          )
+          .font(.system(.body, design: .monospaced))
+          .multilineTextAlignment(.leading)
 
           TextField("Link", text: $link, prompt: Text("optional — ticket, doc, PR"))
+            .multilineTextAlignment(.leading)
         } footer: {
           VStack(alignment: .leading, spacing: 2) {
             if !name.isEmpty {
