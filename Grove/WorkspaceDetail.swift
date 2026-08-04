@@ -185,7 +185,13 @@ struct WorkspaceDetail: View {
   }
 }
 
-/// Coloured pill showing where a repo has got to.
+/// Shows where a repo has got to, and shows nothing when there is nothing to
+/// say.
+///
+/// `.unknown` means the worktree is on disk and Grove has no setup record —
+/// true of everything it adopted rather than created, which is most rows most of
+/// the time. A badge on every row that reports the ordinary case is noise. The
+/// space stays reserved so rows do not jump when a setup starts.
 struct StateBadge: View {
   let state: RepoState
   let busy: Bool
@@ -194,22 +200,22 @@ struct StateBadge: View {
     Group {
       if busy {
         ProgressView().controlSize(.small)
-      } else {
+      } else if let symbol {
         Image(systemName: symbol)
           .foregroundStyle(tint)
+          .help(help)
       }
     }
     .frame(width: 16)
-    .help(help)
   }
 
-  private var symbol: String {
+  private var symbol: String? {
     switch state {
     case .ready: "checkmark.circle.fill"
     case .failed: "exclamationmark.triangle.fill"
     case .pending: "circle.dashed"
     case .settingUp: "circle.dotted"
-    case .unknown: "circle"
+    case .unknown: nil
     }
   }
 
@@ -219,7 +225,7 @@ struct StateBadge: View {
     case .failed: .red
     case .pending: .secondary
     case .settingUp: .blue
-    case .unknown: .secondary
+    case .unknown: .clear
     }
   }
 
@@ -229,7 +235,7 @@ struct StateBadge: View {
     case .failed: "Setup failed — re-run it from the menu"
     case .pending: "Recorded but not on disk"
     case .settingUp: "Working"
-    case .unknown: "On disk; Grove has no setup record"
+    case .unknown: ""
     }
   }
 }
