@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build, e.g. 0.2.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    name: Build and publish
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building $version"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodegen generate
+          xcodebuild \
+            -project Grove.xcodeproj \
+            -scheme Grove \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Sign ad-hoc
+        # Grove spawns git, gh and per-repo setup scripts and reads repositories
+        # anywhere on disk, so it cannot be sandboxed and will never ship through
+        # the App Store. Proper distribution wants a Developer ID and
+        # notarisation; until those secrets exist, an ad-hoc signature at least
+        # gives the bundle a stable identity on the machine that runs it.
+        run: |
+          codesign --force --deep --sign - build/Build/Products/Release/Grove.app
+          codesign --verify --verbose build/Build/Products/Release/Grove.app
+
+      - name: Make the disk image
+        run: |
+          staging=$(mktemp -d)
+          cp -R build/Build/Products/Release/Grove.app "$staging/"
+          ln -s /Applications "$staging/Applications"
+          hdiutil create \
+            -volname "Grove ${{ steps.version.outputs.version }}" \
+            -srcfolder "$staging" \
+            -ov -format UDZO \
+            "Grove-${{ steps.version.outputs.version }}.dmg"
+          shasum -a 256 "Grove-${{ steps.version.outputs.version }}.dmg" | tee checksums.txt
+
+      - name: Publish
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Installing
+
+          This build is ad-hoc signed, not notarised, so Gatekeeper will block the
+          first launch. Right-click the app and choose Open, or:
+
+          ```
+          xattr -dr com.apple.quarantine /Applications/Grove.app
+          ```
+          NOTES
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Grove $VERSION" \
+            --notes-file notes.md \
+            "Grove-$VERSION.dmg" \
+            checksums.txt
+
+      - name: Keep the build when there is no release to attach it to
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Grove-${{ steps.version.outputs.version }}
+          path: |
+            Grove-*.dmg
+            checksums.txt

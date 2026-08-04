@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A newer push to the same branch makes an in-flight run pointless.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: GroveCore
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version && xcodebuild -version
+
+      - name: Check formatting
+        # Lints rather than rewrites, so a badly formatted commit fails here
+        # instead of turning up as noise in someone's next diff.
+        run: swift format lint --strict --recursive Sources Tests Grove scripts
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        # The git tests build real repositories in temporary directories and
+        # commit to them, so the runner needs an identity of its own.
+        run: |
+          git config --global user.name "Grove CI"
+          git config --global user.email "ci@grove.invalid"
+          swift test
+
+  app:
+    name: Grove.app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build
+        # Unsigned: a CI runner has no Developer ID, and the build is what is
+        # being checked here, not the signature.
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Grove.xcodeproj \
+            -scheme Grove \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Check the bundle is whole
+        run: |
+          app=build/Build/Products/Release/Grove.app
+          test -x "$app/Contents/MacOS/Grove"
+          test -f "$app/Contents/Resources/Grove.icns"
+          # The pull request glyphs are loaded by name at runtime, so a missing
+          # one is a blank badge rather than a build error.
+          for icon in git-pull-request git-merge git-pull-request-closed git-pull-request-draft; do
+            test -f "$app/Contents/Resources/$icon.svg"
+          done
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")" = Grove
+
+  icon:
+    name: Icon is current
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Regenerate and compare
+        # The icon is committed but generated. This catches a change to the
+        # script that nobody re-ran.
+        run: |
+          shasum -a 256 Grove/Resources/Grove.icns > /tmp/before
+          swift scripts/make-icon.swift Grove/Resources
+          shasum -a 256 Grove/Resources/Grove.icns > /tmp/after
+          diff /tmp/before /tmp/after || {
+            echo "Grove.icns is out of date — run 'make icon' and commit the result."
+            exit 1
+          }

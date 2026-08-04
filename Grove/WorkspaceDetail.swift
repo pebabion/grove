@@ -32,6 +32,7 @@ struct WorkspaceDetail: View {
         } label: {
           Label("More", systemImage: "ellipsis.circle")
         }
+        .menuIndicator(.hidden)
       }
     }
   }
@@ -169,6 +170,7 @@ struct WorkspaceDetail: View {
           Image(systemName: "ellipsis")
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
       }
 
@@ -202,7 +204,7 @@ struct WorkspaceDetail: View {
             }
           }
         } label: {
-          Label("Add Repo", systemImage: "plus.circle")
+          Text("Add Repo")
         }
         .menuStyle(.button)
         .fixedSize()
