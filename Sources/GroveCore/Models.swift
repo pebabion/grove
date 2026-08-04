@@ -52,11 +52,28 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// Application used by the "open workspace" action, by bundle id or name.
   public var editor: String?
 
-  public init(repos: [RepoEntry] = [], workspaceRoot: String = "~/worktrees", editor: String? = nil)
-  {
+  /// Prepended to generated branch names, e.g. `kelvin` gives `kelvin/thing`.
+  public var branchPrefix: String?
+
+  public init(
+    repos: [RepoEntry] = [],
+    workspaceRoot: String = "~/worktrees",
+    editor: String? = nil,
+    branchPrefix: String? = nil
+  ) {
     self.repos = repos
     self.workspaceRoot = workspaceRoot
     self.editor = editor
+    self.branchPrefix = branchPrefix
+  }
+
+  /// The branch a workspace called `name` gets by default.
+  public func suggestedBranch(for name: String) -> String {
+    let slug = WorkspaceNaming.slug(name)
+    guard let prefix = branchPrefix?.trimmingCharacters(in: .whitespaces), !prefix.isEmpty else {
+      return slug
+    }
+    return "\(prefix)/\(slug)"
   }
 
   public var workspaceRootURL: URL {

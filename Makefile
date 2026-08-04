@@ -1,4 +1,4 @@
-.PHONY: help test build app run xcode clean install
+.PHONY: help test build project app run xcode clean install
 
 APP := build/Build/Products/Debug/Grove.app
 
@@ -16,11 +16,13 @@ test:
 build:
 	swift build
 
-Grove.xcodeproj: project.yml
-	xcodegen generate
+# Always regenerate: xcodegen globs the source directories, so a new file that
+# project.yml never mentions still has to be picked up.
+project:
+	@xcodegen generate --quiet
 
 # Builds into ./build rather than DerivedData so the app has a predictable path.
-app: Grove.xcodeproj
+app: project
 	xcodebuild -project Grove.xcodeproj -scheme Grove -configuration Debug \
 		-destination 'platform=macOS' -derivedDataPath build \
 		CODE_SIGNING_ALLOWED=NO build | tail -3
@@ -28,7 +30,7 @@ app: Grove.xcodeproj
 run: app
 	open $(APP)
 
-xcode: Grove.xcodeproj
+xcode: project
 	open Grove.xcodeproj
 
 install: app

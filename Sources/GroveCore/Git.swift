@@ -159,6 +159,26 @@ public struct Git: Sendable {
     return result.succeeded
   }
 
+  /// The source clone a worktree belongs to.
+  ///
+  /// Every worktree of a repository shares one `.git` directory, and its parent
+  /// is the original clone. This is how Grove maps a worktree it finds on disk
+  /// back to a library entry — matching on directory names would guess wrong.
+  public func sourceClone(of worktree: URL) async throws -> URL? {
+    let result = try await attempt([
+      "-C", worktree.path, "rev-parse", "--path-format=absolute", "--git-common-dir",
+    ])
+    guard result.succeeded, !result.trimmedOutput.isEmpty else { return nil }
+    return URL(filePath: result.trimmedOutput).deletingLastPathComponent()
+  }
+
+  /// Short name of the checked-out branch, or `nil` when HEAD is detached.
+  public func currentBranch(worktree: URL) async throws -> String? {
+    let result = try await attempt(["-C", worktree.path, "symbolic-ref", "--short", "HEAD"])
+    guard result.succeeded, !result.trimmedOutput.isEmpty else { return nil }
+    return result.trimmedOutput
+  }
+
   public func hasUncommittedChanges(worktree: URL) async throws -> Bool {
     let result = try await attempt(["-C", worktree.path, "status", "--porcelain"])
     return result.succeeded && !result.trimmedOutput.isEmpty

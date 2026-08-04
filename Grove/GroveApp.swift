@@ -3,43 +3,35 @@ import SwiftUI
 
 @main
 struct GroveApp: App {
-  @State private var environment = AppEnvironment()
+  @State private var model = AppModel()
 
   var body: some Scene {
     WindowGroup {
       ContentView()
-        .environment(environment)
-        .task { await environment.start() }
+        .environment(model)
+        .task { await model.load() }
     }
-    .defaultSize(width: 900, height: 600)
+    .defaultSize(width: 1000, height: 680)
     .commands {
-      CommandGroup(after: .newItem) {
-        Button("Rescan Tools") {
-          Task { await environment.start() }
+      CommandGroup(replacing: .newItem) {
+        Button("New Workspace…") {
+          NotificationCenter.default.post(name: .newWorkspace, object: nil)
         }
-        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .keyboardShortcut("n")
       }
+      CommandGroup(after: .toolbar) {
+        Button("Rescan") { Task { await model.rescan() } }
+          .keyboardShortcut("r")
+      }
+    }
+
+    Settings {
+      SettingsView()
+        .environment(model)
     }
   }
 }
 
-/// App-wide state. Currently just the resolved tool paths; the repo library and
-/// workspace scanner land here next.
-@Observable
-@MainActor
-final class AppEnvironment {
-  var toolPaths = ToolPaths()
-  var isLoading = true
-
-  func start() async {
-    isLoading = true
-    toolPaths = await ToolPaths.discover()
-    isLoading = false
-  }
-
-  /// A `Git` bound to the discovered `git`, or `nil` if there isn't one.
-  var git: Git? {
-    guard let executable = toolPaths.location(of: "git") else { return nil }
-    return Git(executable: executable, environment: toolPaths.processEnvironment())
-  }
+extension Notification.Name {
+  static let newWorkspace = Notification.Name("grove.newWorkspace")
 }
