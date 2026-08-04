@@ -77,7 +77,11 @@ pull request had been merged reporting as unmerged, next to a branch with no pul
 request at all reporting as merged.
 
 The pull request's own state is the only reliable signal, and Grove already has
-it. Comparing against the base answers a narrower question — whether anything
-would be lost — and answers it for two unrelated reasons: a branch never
-committed to, and one whose commits the base already absorbed. Say "nothing to
-lose" for that, never "merged".
+it. A commit count against the base cannot stand in: it reaches zero both for a
+branch never committed to and for one whose commits the base has absorbed, so it
+says nothing about merging either way.
+
+The teardown badge therefore shows only what the pull request says — merged, or
+closed unmerged — and nothing at all otherwise. The ordinary case needs no label;
+the card already reports "nothing unsaved, safe to remove" when there is nothing
+to lose.

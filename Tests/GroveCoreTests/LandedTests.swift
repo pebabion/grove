@@ -3,34 +3,15 @@ import Testing
 
 @testable import GroveCore
 
-/// The teardown sheet used to label a branch "merged" from an ancestor check
-/// alone. Both of these cases were wrong on real repositories, so both are
-/// pinned here.
-@Suite("has the work landed", .serialized)
+/// Grove once decided "merged" by comparing a branch against its base. These
+/// tests record why that cannot work, so nobody wires it back in: the pull
+/// request's own state is the only signal that survives how teams actually merge.
+@Suite("counting commits against a base", .serialized)
 struct LandedTests {
   let git = Git()
 
-  @Test("a branch with no commits of its own is not merged work")
-  func branchWithNothingOnIt() async throws {
-    let sandbox = try Sandbox()
-    let repo = try await sandbox.makeRepository(named: "backend", withRemote: true)
-    let worktree = sandbox.root.appending(path: "spaces/thing/backend")
-    // Created from the base and never committed to, which is what an untouched
-    // worktree looks like.
-    try await git.addWorktree(repo: repo, at: worktree, branch: "kelvin/idle", base: "main")
-
-    let risk = await WorktreeAuditor(git: git).audit(
-      worktree: worktree,
-      repo: RepoEntry(name: "backend", path: repo.path, base: "main")
-    )
-
-    // Nothing would be lost — but nothing was merged either. The old label said
-    // "merged" here, which claimed work landed where there had never been any.
-    #expect(!risk.hasCommitsNotInBase)
-  }
-
-  @Test("a squash merge leaves the branch outside its base")
-  func squashMergeIsInvisibleToAncestry() async throws {
+  @Test("a squash merge leaves the branch still ahead of its base")
+  func squashMergeStaysAhead() async throws {
     let sandbox = try Sandbox()
     let repo = try await sandbox.makeRepository(named: "agent-graph", withRemote: true)
     let worktree = sandbox.root.appending(path: "spaces/thing/agent-graph")
@@ -39,24 +20,20 @@ struct LandedTests {
     try sandbox.write("a feature\n", to: worktree.appending(path: "feature.txt"))
     try await sandbox.commit(in: worktree, message: "add the feature")
 
-    // Squash it onto main the way GitHub's squash button does: one new commit
-    // carrying the same tree, with a different identity.
+    // Squash onto main the way GitHub's squash button does: one new commit with
+    // the same tree and a different identity.
     try await git.run(["-C", repo.path, "merge", "--squash", "kelvin/work"])
     try await git.run(["-C", repo.path, "commit", "-m", "add the feature (#1)"])
     try await git.run(["-C", repo.path, "push", "-q", "origin", "main"])
 
-    let risk = await WorktreeAuditor(git: git).audit(
-      worktree: worktree,
-      repo: RepoEntry(name: "agent-graph", path: repo.path, base: "main")
-    )
-
-    // The work is fully in main, yet the branch still reports commits main lacks,
-    // because the squash rewrote them. This is why the pull request state decides.
-    #expect(risk.hasCommitsNotInBase)
+    // The work is wholly in main, yet the branch still reports a commit main
+    // lacks, because the squash rewrote it. Any "is it merged" check built on
+    // this number would say no for as long as the branch exists.
+    #expect(try await git.commitCount(worktree: worktree, notIn: "main") == 1)
   }
 
-  @Test("a plain merge leaves nothing to lose")
-  func plainMergeLeavesNothing() async throws {
+  @Test("a merge commit does bring the count to zero")
+  func plainMergeClearsTheCount() async throws {
     let sandbox = try Sandbox()
     let repo = try await sandbox.makeRepository(named: "frontend", withRemote: true)
     let worktree = sandbox.root.appending(path: "spaces/thing/frontend")
@@ -64,15 +41,20 @@ struct LandedTests {
 
     try sandbox.write("more\n", to: worktree.appending(path: "more.txt"))
     try await sandbox.commit(in: worktree, message: "more work")
-
     try await git.run(["-C", repo.path, "merge", "--no-ff", "-m", "merge", "kelvin/ff"])
-    try await git.run(["-C", repo.path, "push", "-q", "origin", "main"])
 
-    let risk = await WorktreeAuditor(git: git).audit(
-      worktree: worktree,
-      repo: RepoEntry(name: "frontend", path: repo.path, base: "main")
-    )
+    #expect(try await git.commitCount(worktree: worktree, notIn: "main") == 0)
+  }
 
-    #expect(!risk.hasCommitsNotInBase)
+  @Test("a branch never committed to also reports zero")
+  func untouchedBranchReportsZero() async throws {
+    let sandbox = try Sandbox()
+    let repo = try await sandbox.makeRepository(named: "backend", withRemote: true)
+    let worktree = sandbox.root.appending(path: "spaces/thing/backend")
+    try await git.addWorktree(repo: repo, at: worktree, branch: "kelvin/idle", base: "main")
+
+    // Zero for a quite different reason than the merge above, which is why this
+    // number cannot be dressed up as "merged" either way.
+    #expect(try await git.commitCount(worktree: worktree, notIn: "main") == 0)
   }
 }

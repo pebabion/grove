@@ -292,8 +292,7 @@ public struct WorkspaceService: Sendable {
     let auditor = WorktreeAuditor(git: git)
     var risks: [String: WorktreeRisk] = [:]
     for member in workspace.members {
-      risks[member.repoName] = await auditor.audit(
-        worktree: member.url, repo: library[member.repoName])
+      risks[member.repoName] = await auditor.audit(worktree: member.url)
     }
     return risks
   }

@@ -50,7 +50,7 @@ public struct WorktreeAuditor: Sendable {
     self.git = git
   }
 
-  public func audit(worktree: URL, repo: RepoEntry?) async -> WorktreeRisk {
+  public func audit(worktree: URL) async -> WorktreeRisk {
     var risk = WorktreeRisk()
     guard FileManager.default.fileExists(atPath: worktree.path) else { return risk }
 
@@ -62,10 +62,6 @@ public struct WorktreeAuditor: Sendable {
     risk.unpushedCommits = (try? await git.unpushedCommits(worktree: worktree)) ?? []
     risk.unlinkedEnvFiles = Self.unlinkedEnvFiles(in: worktree)
 
-    if let repo {
-      let ahead = (try? await git.commitCount(worktree: worktree, notIn: repo.base)) ?? 0
-      risk.hasCommitsNotInBase = ahead > 0
-    }
     return risk
   }
 

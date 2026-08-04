@@ -125,7 +125,7 @@ struct TeardownSheet: View {
           .foregroundStyle(risk.isEmpty ? Color.green : Color.orange)
         Text(member.repoName)
           .fontWeight(.medium)
-        if let mark = landedMark(for: member, risk: risk) {
+        if let mark = landedMark(for: member) {
           Text(mark.label)
             .font(.caption2)
             .foregroundStyle(mark.tint)
@@ -156,36 +156,28 @@ struct TeardownSheet: View {
     .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
   }
 
-  /// Whether this repo's work is safe elsewhere.
+  /// A badge only when the work's fate is worth knowing.
   ///
-  /// The pull request's state decides, because it is the only signal that
-  /// survives a squash merge — a squash rewrites the commit, so the branch never
-  /// becomes an ancestor of its base however completely the work landed.
+  /// Read from the pull request, which is the only signal a squash merge survives:
+  /// a squash rewrites the commit, so a fully merged branch never becomes an
+  /// ancestor of its base.
   ///
-  /// Comparing against the base can only say whether anything would be lost, and
-  /// it says so for two unrelated reasons: a branch never committed to, and one
-  /// whose commits the base already has. "Nothing to lose" is true of both and
-  /// claims neither was merged.
+  /// Nothing is said about the ordinary case. The card already reports "nothing
+  /// unsaved, safe to remove" when there is nothing to lose, and a badge
+  /// repeating it would be another label that fires on every row and tells the
+  /// reader nothing.
   private func landedMark(
-    for member: WorkspaceMember, risk: WorktreeRisk
+    for member: WorkspaceMember
   ) -> (label: String, tint: Color, explanation: String)? {
-    if let pr = model.pullRequest(for: member)?.pullRequest {
-      switch pr.state {
-      case "MERGED":
-        return ("merged", .green, "Pull request #\(pr.number) was merged")
-      case "CLOSED":
-        return ("closed unmerged", .orange, "Pull request #\(pr.number) was closed without merging")
-      default:
-        break
-      }
+    guard let pr = model.pullRequest(for: member)?.pullRequest else { return nil }
+    switch pr.state {
+    case "MERGED":
+      return ("merged", .green, "Pull request #\(pr.number) was merged")
+    case "CLOSED":
+      return ("closed unmerged", .orange, "Pull request #\(pr.number) was closed without merging")
+    default:
+      return nil
     }
-    if !risk.hasCommitsNotInBase {
-      return (
-        "nothing to lose", .green,
-        "The branch holds no commit that \(model.library[member.repoName]?.base ?? "its base") lacks"
-      )
-    }
-    return nil
   }
 
   @ViewBuilder

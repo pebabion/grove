@@ -24,7 +24,7 @@ struct AuditTests {
     #expect(try await git.clonewideStashes(worktree: worktree).count == 1)
     #expect(try await git.clonewideStashes(worktree: repo).count == 1)
 
-    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree, repo: nil)
+    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree)
     #expect(risk.isEmpty)
 
     // The point: removing the worktree does not take the stash with it.
@@ -42,7 +42,7 @@ struct AuditTests {
     try sandbox.write("new work\n", to: worktree.appending(path: "feature.txt"))
     try await sandbox.commit(in: worktree, message: "unpushed work")
 
-    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree, repo: nil)
+    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree)
 
     #expect(!risk.isEmpty)
     #expect(risk.unpushedCommits.contains { $0.hasSuffix("unpushed work") })
@@ -64,7 +64,7 @@ struct AuditTests {
       withDestinationURL: repo.appending(path: ".env.shared")
     )
 
-    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree, repo: nil)
+    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree)
 
     #expect(risk.unlinkedEnvFiles.contains(".env"))
     #expect(!risk.unlinkedEnvFiles.contains(".env.shared"))
@@ -79,7 +79,7 @@ struct AuditTests {
 
     try sandbox.write("KEY=\n", to: worktree.appending(path: ".env.example"))
 
-    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree, repo: nil)
+    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree)
 
     #expect(risk.unlinkedEnvFiles.isEmpty)
   }
@@ -91,7 +91,7 @@ struct AuditTests {
     let worktree = sandbox.root.appending(path: "spaces/thing/frontend")
     try await git.addWorktree(repo: repo, at: worktree, branch: "kelvin/thing", base: "main")
 
-    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree, repo: nil)
+    let risk = await WorktreeAuditor(git: git).audit(worktree: worktree)
 
     #expect(risk.isEmpty)
   }

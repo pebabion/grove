@@ -39,18 +39,6 @@ public struct WorktreeRisk: Sendable, Hashable {
   /// `.env*` entries that are real files rather than symlinks into the source clone.
   public var unlinkedEnvFiles: [String] = []
 
-  /// Whether the branch holds any commit its base branch lacks.
-  ///
-  /// `false` covers two different situations that look identical from here — a
-  /// branch never committed to, and one whose commits the base has since
-  /// absorbed — so it answers "is there anything to lose", not "was this merged".
-  ///
-  /// It cannot answer the second question anyway. A squash or rebase merge
-  /// rewrites the commit, so a fully merged branch still reports `true`, and
-  /// squash is how most teams merge. Only the pull request's own state settles
-  /// whether work landed.
-  public var hasCommitsNotInBase: Bool = false
-
   public var isEmpty: Bool {
     uncommittedFiles.isEmpty && untrackedFiles.isEmpty && ignoredFiles.isEmpty
       && unpushedCommits.isEmpty && unlinkedEnvFiles.isEmpty
