@@ -44,8 +44,9 @@ enum RepoPalette {
   }
 }
 
-/// A repo's colour swatch. Greys out for a worktree whose clone is not in the
-/// library, which is how an adopted stray reads as unmanaged.
+/// A repo's colour swatch, naming the repo on hover. Greys out for a worktree
+/// whose clone is not in the library, which is how an adopted stray reads as
+/// unmanaged.
 struct RepoSwatch: View {
   @Environment(AppModel.self) private var model
   let repo: String
@@ -55,6 +56,16 @@ struct RepoSwatch: View {
     RoundedRectangle(cornerRadius: size / 3)
       .fill(RepoPalette.color(slot: model.library.colorIndex(for: repo)))
       .frame(width: size, height: size)
+      // The dot is 7pt in the sidebar, too small to hover on purpose. Grow the
+      // hit area, then take the space back so nothing shifts.
+      .padding(4)
+      .contentShape(Rectangle())
+      .padding(-4)
+      .help(tooltip)
+  }
+
+  private var tooltip: String {
+    model.library[repo] == nil ? "\(repo) — not in your repo library" : repo
   }
 }
 

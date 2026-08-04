@@ -164,7 +164,6 @@ struct WorkspaceRow: View {
         HStack(spacing: 4) {
           ForEach(workspace.members) { member in
             RepoSwatch(repo: member.repoName, size: 7)
-              .help(member.repoName)
           }
           if !workspace.file.branch.isEmpty {
             Text(workspace.file.branch)
