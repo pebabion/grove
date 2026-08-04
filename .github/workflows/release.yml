@@ -49,6 +49,18 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+      - name: Check the build says which version it is
+        # This shipped wrong once: XcodeGen's generated plist carried a literal
+        # 1.0, so MARKETING_VERSION was ignored and every DMG claimed the same
+        # version. Cheap to assert, invisible when it breaks.
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          built=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            build/Build/Products/Release/Grove.app/Contents/Info.plist)
+          echo "bundle says $built, tag says $VERSION"
+          test "$built" = "$VERSION"
+
       - name: Sign ad-hoc
         # Grove spawns git, gh and per-repo setup scripts and reads repositories
         # anywhere on disk, so it cannot be sandboxed and will never ship through

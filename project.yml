@@ -24,6 +24,10 @@ targets:
       path: Grove/Info.plist
       properties:
         CFBundleIconFile: Grove
+        # Take these from the build settings. Left out, XcodeGen writes a literal
+        # 1.0 and every release reports the same version whatever the tag says.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: ""
