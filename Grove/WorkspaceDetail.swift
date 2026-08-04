@@ -121,6 +121,12 @@ struct WorkspaceDetail: View {
 
         Spacer()
 
+        if let reading = model.pullRequest(for: member) {
+          PullRequestBadge(reading: reading)
+        } else if model.isLoadingPullRequests {
+          ProgressView().controlSize(.small)
+        }
+
         if let commit = member.lastCommit {
           Text(commit, format: .relative(presentation: .numeric, unitsStyle: .narrow))
             .font(.caption)
@@ -145,6 +151,12 @@ struct WorkspaceDetail: View {
           Button("Open") { model.openInEditor(member.url) }
           Button("Reveal in Finder") { model.revealInFinder(member.url) }
           Button("Open in Terminal") { model.openInTerminal(member.url) }
+          if let pr = model.pullRequest(for: member)?.pullRequest,
+            let url = URL(string: pr.url)
+          {
+            Divider()
+            Link("Open Pull Request #\(pr.number)", destination: url)
+          }
           Divider()
           Button("Re-run Setup") {
             Task { await model.rerunSetup(for: member, in: workspace) }

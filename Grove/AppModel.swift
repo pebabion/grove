@@ -33,6 +33,10 @@ final class AppModel {
   var sizes = SizeCache()
   var pendingMeasurements = 0
 
+  /// Cached pull request answers, and whether a refresh is in flight.
+  var pullRequests = PullRequestCache()
+  var isLoadingPullRequests = false
+
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
 
@@ -58,11 +62,15 @@ final class AppModel {
     // Cached sizes only. Measuring walks every file and takes tens of seconds,
     // so it never happens without being asked for.
     sizes = (try? store.load(SizeCache.self, from: SizeCache.fileURL)) ?? SizeCache()
+    pullRequests =
+      (try? store.load(PullRequestCache.self, from: PullRequestCache.fileURL))
+      ?? PullRequestCache()
     await rescan()
 
     // Behind the interface, not in front of it: the window is usable while this
     // runs, and it is the reason sizes appear without being asked for.
     Task { await measureStale() }
+    Task { await refreshPullRequests() }
     startBackgroundMeasurement()
   }
 
@@ -258,6 +266,68 @@ final class AppModel {
       errorMessage = error.localizedDescription
       await rescan()
     }
+  }
+
+  // MARK: - Pull requests
+
+  func pullRequest(for member: WorkspaceMember) -> PullRequestReading? {
+    guard let branch = member.branch else { return nil }
+    return pullRequests[member.repoName, branch]
+  }
+
+  /// Looks up any branch whose answer is missing or stale.
+  ///
+  /// Pass `force` to ignore freshness, for the explicit refresh action.
+  func refreshPullRequests(force: Bool = false) async {
+    guard let executable = toolPaths.location(of: "gh"), !isLoadingPullRequests else { return }
+
+    let now = Date()
+    var wanted: [(repo: String, branch: String, worktree: URL)] = []
+    var seen = Set<String>()
+    for workspace in workspaces {
+      for member in workspace.members {
+        guard let branch = member.branch else { continue }
+        let key = PullRequestCache.key(repo: member.repoName, branch: branch)
+        guard seen.insert(key).inserted else { continue }
+        if !force, let reading = pullRequests[member.repoName, branch], reading.isFresh(asOf: now) {
+          continue
+        }
+        wanted.append((member.repoName, branch, member.url))
+      }
+    }
+    guard !wanted.isEmpty else { return }
+
+    isLoadingPullRequests = true
+    defer { isLoadingPullRequests = false }
+
+    let github = GitHub(executable: executable, environment: toolPaths.processEnvironment())
+    var remaining = wanted[...]
+
+    await withTaskGroup(of: (String, String, PullRequestLookup).self) { group in
+      func start(_ item: (repo: String, branch: String, worktree: URL)) {
+        group.addTask {
+          (item.repo, item.branch, await github.pullRequest(for: item.branch, in: item.worktree))
+        }
+      }
+      for _ in 0..<min(GitHub.concurrencyLimit, wanted.count) {
+        guard let next = remaining.popFirst() else { break }
+        start(next)
+      }
+      while let (repo, branch, lookup) = await group.next() {
+        switch lookup {
+        case .found(let pr):
+          pullRequests[repo, branch] = PullRequestReading(pullRequest: pr, fetchedAt: Date())
+        case .none:
+          pullRequests[repo, branch] = PullRequestReading(pullRequest: nil, fetchedAt: Date())
+        case .unknown:
+          // Leave any previous answer alone rather than recording a failure.
+          break
+        }
+        if let next = remaining.popFirst() { start(next) }
+      }
+    }
+
+    try? store.save(pullRequests, to: PullRequestCache.fileURL)
   }
 
   // MARK: - Disk usage
