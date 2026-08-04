@@ -62,9 +62,9 @@ public struct WorktreeAuditor: Sendable {
     risk.unpushedCommits = (try? await git.unpushedCommits(worktree: worktree)) ?? []
     risk.unlinkedEnvFiles = Self.unlinkedEnvFiles(in: worktree)
 
-    if let repo, let branch = try? await git.currentBranch(worktree: worktree) {
-      risk.isMerged =
-        (try? await git.isMerged(repo: repo.url, branch: branch, into: repo.base)) ?? false
+    if let repo {
+      let ahead = (try? await git.commitCount(worktree: worktree, notIn: repo.base)) ?? 0
+      risk.hasCommitsNotInBase = ahead > 0
     }
     return risk
   }

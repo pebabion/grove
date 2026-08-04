@@ -125,12 +125,14 @@ struct TeardownSheet: View {
           .foregroundStyle(risk.isEmpty ? Color.green : Color.orange)
         Text(member.repoName)
           .fontWeight(.medium)
-        if risk.isMerged {
-          Text("merged")
+        if let mark = landedMark(for: member, risk: risk) {
+          Text(mark.label)
             .font(.caption2)
+            .foregroundStyle(mark.tint)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(.green.opacity(0.2), in: Capsule())
+            .background(mark.tint.opacity(0.18), in: Capsule())
+            .help(mark.explanation)
         }
         Spacer()
       }
@@ -152,6 +154,38 @@ struct TeardownSheet: View {
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+  }
+
+  /// Whether this repo's work is safe elsewhere.
+  ///
+  /// The pull request's state decides, because it is the only signal that
+  /// survives a squash merge — a squash rewrites the commit, so the branch never
+  /// becomes an ancestor of its base however completely the work landed.
+  ///
+  /// Comparing against the base can only say whether anything would be lost, and
+  /// it says so for two unrelated reasons: a branch never committed to, and one
+  /// whose commits the base already has. "Nothing to lose" is true of both and
+  /// claims neither was merged.
+  private func landedMark(
+    for member: WorkspaceMember, risk: WorktreeRisk
+  ) -> (label: String, tint: Color, explanation: String)? {
+    if let pr = model.pullRequest(for: member)?.pullRequest {
+      switch pr.state {
+      case "MERGED":
+        return ("merged", .green, "Pull request #\(pr.number) was merged")
+      case "CLOSED":
+        return ("closed unmerged", .orange, "Pull request #\(pr.number) was closed without merging")
+      default:
+        break
+      }
+    }
+    if !risk.hasCommitsNotInBase {
+      return (
+        "nothing to lose", .green,
+        "The branch holds no commit that \(model.library[member.repoName]?.base ?? "its base") lacks"
+      )
+    }
+    return nil
   }
 
   @ViewBuilder

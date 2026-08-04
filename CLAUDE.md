@@ -67,3 +67,17 @@ wrong.
 
 Follow the writing rules in the user's global CLAUDE.md for all docs, commit
 messages and PR text.
+
+## Has the work landed?
+
+**Never answer this from `merge-base --is-ancestor` alone.** A squash or rebase
+merge rewrites the commit, so a fully merged branch is never an ancestor of its
+base — and squash is how most teams merge. A real workspace showed a branch whose
+pull request had been merged reporting as unmerged, next to a branch with no pull
+request at all reporting as merged.
+
+The pull request's own state is the only reliable signal, and Grove already has
+it. Comparing against the base answers a narrower question — whether anything
+would be lost — and answers it for two unrelated reasons: a branch never
+committed to, and one whose commits the base already absorbed. Say "nothing to
+lose" for that, never "merged".

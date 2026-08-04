@@ -38,8 +38,18 @@ public struct WorktreeRisk: Sendable, Hashable {
   public var unpushedCommits: [String] = []
   /// `.env*` entries that are real files rather than symlinks into the source clone.
   public var unlinkedEnvFiles: [String] = []
-  /// True when the branch is an ancestor of its comparison target.
-  public var isMerged: Bool = false
+
+  /// Whether the branch holds any commit its base branch lacks.
+  ///
+  /// `false` covers two different situations that look identical from here — a
+  /// branch never committed to, and one whose commits the base has since
+  /// absorbed — so it answers "is there anything to lose", not "was this merged".
+  ///
+  /// It cannot answer the second question anyway. A squash or rebase merge
+  /// rewrites the commit, so a fully merged branch still reports `true`, and
+  /// squash is how most teams merge. Only the pull request's own state settles
+  /// whether work landed.
+  public var hasCommitsNotInBase: Bool = false
 
   public var isEmpty: Bool {
     uncommittedFiles.isEmpty && untrackedFiles.isEmpty && ignoredFiles.isEmpty
@@ -227,6 +237,13 @@ public struct Git: Sendable {
     ])
     guard result.succeeded else { return [] }
     return result.trimmedOutput.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
+  }
+
+  /// How many commits the worktree's branch has that `base` does not.
+  public func commitCount(worktree: URL, notIn base: String) async throws -> Int {
+    let result = try await attempt(["-C", worktree.path, "rev-list", "--count", "HEAD", "^\(base)"])
+    guard result.succeeded else { return 0 }
+    return Int(result.trimmedOutput) ?? 0
   }
 
   /// Stashes belonging to the clone this worktree came from.
