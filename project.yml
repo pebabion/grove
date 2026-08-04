@@ -18,6 +18,16 @@ targets:
     dependencies:
       - package: GroveCore
         product: GroveCore
+    # An explicit plist, because GENERATE_INFOPLIST_FILE has no build setting for
+    # CFBundleIconFile and the app icon has to be named somewhere.
+    info:
+      path: Grove/Info.plist
+      properties:
+        CFBundleIconFile: Grove
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: ""
+        NSHighResolutionCapable: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pebabion.Grove
@@ -25,9 +35,6 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
-        INFOPLIST_KEY_NSHumanReadableCopyright: ""
         ENABLE_HARDENED_RUNTIME: YES
         # No App Sandbox. Grove spawns git, gh and per-repo setup scripts, and
         # reads repositories anywhere on disk. A sandbox cannot express that, so

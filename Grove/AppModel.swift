@@ -257,11 +257,19 @@ final class AppModel {
         deleteBranches: deleteBranches,
         onUpdate: handler(forWorkspaceAt: workspace.url)
       )
-      selection = nil
-      await rescan()
+      // Update the list before rescanning. A rescan runs git in every remaining
+      // worktree and takes seconds; waiting for it would leave the deleted row
+      // on screen and the detail pane empty for all of that time.
+      let neighbour = SelectionAfterRemoval.next(
+        after: workspace.url, in: workspaces.map(\.url))
+      workspaces.removeAll { $0.url == workspace.url }
+      selection = neighbour
+
       // Drop the deleted workspace's reading so it stops counting in the total.
       sizes.prune(keeping: workspaces.map(\.url))
       try? store.save(sizes, to: SizeCache.fileURL)
+
+      await rescan()
     } catch {
       errorMessage = error.localizedDescription
       await rescan()

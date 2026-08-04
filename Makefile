@@ -1,4 +1,4 @@
-.PHONY: help test build project app run xcode clean install
+.PHONY: help test build project app run xcode clean install icon
 
 APP := build/Build/Products/Debug/Grove.app
 
@@ -8,6 +8,7 @@ help:
 	@echo "make run      build and launch Grove.app"
 	@echo "make xcode    regenerate the project and open Xcode"
 	@echo "make install  copy Grove.app to /Applications"
+	@echo "make icon     regenerate Grove.icns and icon.png"
 	@echo "make clean    delete build output"
 
 test:
@@ -40,3 +41,6 @@ install: app
 
 clean:
 	rm -rf build .build Grove.xcodeproj
+
+icon:
+	swift scripts/make-icon.swift Grove/Resources icon.png

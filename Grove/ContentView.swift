@@ -13,9 +13,10 @@ struct ContentView: View {
     } detail: {
       if let workspace = model.selectedWorkspace {
         WorkspaceDetail(workspace: workspace)
-      } else if model.isFirstScan {
-        // The first scan runs git in every worktree and takes seconds. Saying
-        // nothing here reads as an empty app rather than a busy one.
+      } else if model.isScanning {
+        // Scanning runs git in every worktree and takes seconds. Offering "New
+        // Workspace" while that happens claims there is nothing to select, which
+        // is wrong and reads badly straight after deleting one.
         VStack(spacing: 10) {
           ProgressView()
           Text("Reading worktrees…")

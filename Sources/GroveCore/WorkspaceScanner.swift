@@ -1,5 +1,23 @@
 import Foundation
 
+/// Which row to select once one is removed.
+///
+/// Finder and Mail both land on the row that takes the deleted one's place, and
+/// fall back to the one above when the last row goes. Leaving nothing selected
+/// strands the user on an empty pane, which is a poor reply to a destructive
+/// action.
+public enum SelectionAfterRemoval {
+  public static func next<T: Equatable>(after removed: T, in items: [T]) -> T? {
+    guard let index = items.firstIndex(of: removed) else {
+      return items.first { $0 != removed }
+    }
+    var remaining = items
+    remaining.remove(at: index)
+    guard !remaining.isEmpty else { return nil }
+    return remaining[min(index, remaining.count - 1)]
+  }
+}
+
 /// Turns a name into a directory-safe slug.
 public enum WorkspaceNaming {
   public static func slug(_ name: String) -> String {
