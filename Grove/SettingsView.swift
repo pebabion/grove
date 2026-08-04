@@ -26,13 +26,16 @@ struct LibrarySettings: View {
       VStack(spacing: 0) {
         List(selection: $selection) {
           ForEach(model.library.repos) { repo in
-            VStack(alignment: .leading, spacing: 1) {
-              Text(repo.name)
-              Text(repo.path)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.head)
+            HStack(spacing: 8) {
+              RepoSwatch(repo: repo.name, size: 10)
+              VStack(alignment: .leading, spacing: 1) {
+                Text(repo.name)
+                Text(repo.path)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+                  .lineLimit(1)
+                  .truncationMode(.head)
+              }
             }
             .tag(repo.name)
           }

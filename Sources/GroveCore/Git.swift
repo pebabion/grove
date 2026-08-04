@@ -107,6 +107,27 @@ public struct Git: Sendable {
     try await run(["-C", repo.path, "worktree", "prune"])
   }
 
+  /// Re-establishes the link between a clone and a worktree that has moved.
+  ///
+  /// A worktree's `.git` file points into the clone, and the clone keeps a
+  /// `gitdir` file pointing back. Move the directory and the clone's copy is
+  /// stale, so `git worktree list` still reports the old location.
+  ///
+  /// `git worktree repair` exits 0 even when it prints `error: not a valid
+  /// path`, so the exit code cannot be trusted here — the message is the only
+  /// signal that it failed.
+  @discardableResult
+  public func repairWorktree(repo: URL, at path: URL) async throws -> String? {
+    let result = try await attempt([
+      "-C", repo.path, "worktree", "repair", path.path,
+    ])
+    let complaint = result.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !result.succeeded || complaint.lowercased().contains("error:") {
+      return complaint.isEmpty ? "git worktree repair exited \(result.exitCode)" : complaint
+    }
+    return nil
+  }
+
   // MARK: - Branches
 
   public func branchExists(repo: URL, branch: String) async throws -> Bool {

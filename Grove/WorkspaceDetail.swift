@@ -5,7 +5,6 @@ struct WorkspaceDetail: View {
   @Environment(AppModel.self) private var model
   let workspace: Workspace
 
-  @State private var teardownTarget: TeardownTarget?
   @State private var expandedLogs: Set<String> = []
 
   var body: some View {
@@ -29,41 +28,24 @@ struct WorkspaceDetail: View {
         .help(model.library.editor.map { "Open in \($0)" } ?? "Reveal in Finder")
 
         Menu {
-          Button("Reveal in Finder") { model.revealInFinder(workspace.url) }
-          Button("Open in Terminal") { model.openInTerminal(workspace.url) }
-          if let link = workspace.file.link, let url = URL(string: link) {
-            Divider()
-            Link("Open Link", destination: url)
-          }
-          Divider()
-          Button("Delete Workspace…", role: .destructive) {
-            teardownTarget = .whole(workspace)
-          }
+          WorkspaceActions(workspace: workspace)
         } label: {
           Label("More", systemImage: "ellipsis.circle")
         }
       }
     }
-    .sheet(item: $teardownTarget) { target in
-      TeardownSheet(target: target)
-    }
   }
 
   private var header: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 10) {
-        RoundedRectangle(cornerRadius: 4)
-          .fill(Palette.color(for: workspace.name))
-          .frame(width: 5, height: 30)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(workspace.name)
-            .font(.title2.weight(.semibold))
-          if !workspace.file.branch.isEmpty {
-            Text(workspace.file.branch)
-              .font(.system(.caption, design: .monospaced))
-              .foregroundStyle(.secondary)
-              .textSelection(.enabled)
-          }
+      VStack(alignment: .leading, spacing: 2) {
+        Text(workspace.name)
+          .font(.title2.weight(.semibold))
+        if !workspace.file.branch.isEmpty {
+          Text(workspace.file.branch)
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
         }
       }
       Text(workspace.url.path)
@@ -98,6 +80,7 @@ struct WorkspaceDetail: View {
     return VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 10) {
         StateBadge(state: state, busy: state == .settingUp)
+        RepoSwatch(repo: member.repoName, size: 10)
 
         VStack(alignment: .leading, spacing: 2) {
           Text(member.repoName)
@@ -153,7 +136,7 @@ struct WorkspaceDetail: View {
           }
           Divider()
           Button("Remove from Workspace…", role: .destructive) {
-            teardownTarget = .member(member, workspace)
+            model.teardownTarget = .member(member, workspace)
           }
         } label: {
           Image(systemName: "ellipsis")
@@ -247,19 +230,6 @@ struct StateBadge: View {
     case .pending: "Recorded but not on disk"
     case .settingUp: "Working"
     case .unknown: "On disk; Grove has no setup record"
-    }
-  }
-}
-
-/// What a teardown sheet is about to remove.
-enum TeardownTarget: Identifiable {
-  case whole(Workspace)
-  case member(WorkspaceMember, Workspace)
-
-  var id: String {
-    switch self {
-    case .whole(let workspace): "workspace:\(workspace.url.path)"
-    case .member(let member, let workspace): "member:\(workspace.url.path)|\(member.repoName)"
     }
   }
 }

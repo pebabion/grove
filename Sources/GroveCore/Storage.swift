@@ -38,6 +38,24 @@ public struct JSONStore: Sendable {
   }
 }
 
+extension URL {
+  /// One agreed spelling for a path, so two URLs naming the same directory
+  /// compare equal.
+  ///
+  /// Neither `standardizedFileURL` nor `resolvingSymlinksInPath()` is enough on
+  /// its own. FileManager reports `/private/var/…` while a URL built from
+  /// `temporaryDirectory` says `/var/…`, and both survive those calls unchanged.
+  /// macOS has exactly two of these doubled roots, `/private/var` and
+  /// `/private/tmp`, so the shorter spelling is chosen deliberately.
+  public var canonical: URL {
+    let resolved = resolvingSymlinksInPath().standardizedFileURL
+    for root in ["/private/var", "/private/tmp"] where resolved.path.hasPrefix(root + "/") {
+      return URL(filePath: String(resolved.path.dropFirst("/private".count)))
+    }
+    return resolved
+  }
+}
+
 /// Where Grove keeps its files.
 public enum GroveLocations {
   /// `~/.config/grove`

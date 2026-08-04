@@ -41,6 +41,16 @@ struct ContentView: View {
     .sheet(isPresented: $showingCreate) {
       CreateWorkspaceSheet()
     }
+    .sheet(
+      item: Binding(get: { model.renameTarget }, set: { model.renameTarget = $0 })
+    ) { workspace in
+      RenameSheet(workspace: workspace)
+    }
+    .sheet(
+      item: Binding(get: { model.teardownTarget }, set: { model.teardownTarget = $0 })
+    ) { target in
+      TeardownSheet(target: target)
+    }
     .onReceive(of: .newWorkspace) {
       if !model.library.repos.isEmpty { showingCreate = true }
     }
@@ -61,7 +71,11 @@ struct ContentView: View {
     List(selection: Binding(get: { model.selection }, set: { model.selection = $0 })) {
       Section("Workspaces") {
         ForEach(model.workspaces) { workspace in
-          WorkspaceRow(workspace: workspace).tag(workspace.url)
+          WorkspaceRow(workspace: workspace)
+            .tag(workspace.url)
+            .contextMenu {
+              WorkspaceActions(workspace: workspace)
+            }
         }
       }
     }
@@ -136,21 +150,30 @@ struct ContentView: View {
 }
 
 /// One row in the workspace sidebar.
+///
+/// The dots are the workspace's repos, one colour each, so its make-up reads at
+/// a glance without opening it.
 struct WorkspaceRow: View {
   let workspace: Workspace
 
   var body: some View {
     HStack(spacing: 8) {
-      Circle()
-        .fill(Palette.color(for: workspace.name))
-        .frame(width: 8, height: 8)
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: 3) {
         Text(workspace.name)
           .lineLimit(1)
-        Text(subtitle)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
+        HStack(spacing: 4) {
+          ForEach(workspace.members) { member in
+            RepoSwatch(repo: member.repoName, size: 7)
+              .help(member.repoName)
+          }
+          if !workspace.file.branch.isEmpty {
+            Text(workspace.file.branch)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .truncationMode(.head)
+          }
+        }
       }
       Spacer()
       if workspace.members.contains(where: \.hasUncommittedChanges) {
@@ -160,38 +183,6 @@ struct WorkspaceRow: View {
       }
     }
     .padding(.vertical, 2)
-  }
-
-  private var subtitle: String {
-    let count = workspace.members.count
-    let repos = count == 1 ? "1 repo" : "\(count) repos"
-    return workspace.file.branch.isEmpty ? repos : "\(repos) · \(workspace.file.branch)"
-  }
-}
-
-/// Stable per-workspace accent, hashed from the name.
-///
-/// cwt wrote these colours into each worktree's VS Code settings and kept a
-/// counter in config to cycle them. Deriving from the name needs no stored
-/// state and cannot drift.
-enum Palette {
-  private static let colors: [Color] = [
-    .init(red: 0.18, green: 0.55, blue: 0.34),
-    .init(red: 0.42, green: 0.35, blue: 0.80),
-    .init(red: 0.80, green: 0.52, blue: 0.25),
-    .init(red: 0.13, green: 0.59, blue: 0.64),
-    .init(red: 0.75, green: 0.23, blue: 0.17),
-    .init(red: 0.48, green: 0.41, blue: 0.68),
-    .init(red: 0.23, green: 0.49, blue: 0.65),
-    .init(red: 0.37, green: 0.46, blue: 0.43),
-  ]
-
-  static func color(for name: String) -> Color {
-    var hash: UInt64 = 5381
-    for byte in name.utf8 {
-      hash = hash &* 33 &+ UInt64(byte)
-    }
-    return colors[Int(hash % UInt64(colors.count))]
   }
 }
 

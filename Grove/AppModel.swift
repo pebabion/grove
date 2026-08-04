@@ -24,6 +24,11 @@ final class AppModel {
   /// do not overwrite each other's progress.
   var activity: [String: RepoActivity] = [:]
 
+  /// Sheet targets. They live here rather than in a view so the sidebar's
+  /// context menu and the detail pane's menu drive the same sheets.
+  var renameTarget: Workspace?
+  var teardownTarget: TeardownTarget?
+
   private let store = JSONStore()
 
   var git: Git? {
@@ -84,7 +89,12 @@ final class AppModel {
 
     let base = (try? await git.defaultBranch(repo: url)) ?? "origin/main"
     library.repos.append(
-      RepoEntry(name: name, path: shortenHome(url.path), base: base ?? "origin/main"))
+      RepoEntry(
+        name: name,
+        path: shortenHome(url.path),
+        base: base ?? "origin/main",
+        colorIndex: library.nextColorIndex()
+      ))
     library.repos.sort { $0.name < $1.name }
     saveLibrary()
     await rescan()
@@ -158,6 +168,26 @@ final class AppModel {
       branch: member.branch ?? workspace.file.branch,
       onUpdate: handler(forWorkspaceAt: workspace.url)
     )
+  }
+
+  func rename(_ workspace: Workspace, to newName: String) async {
+    guard let git else { return }
+    let service = WorkspaceService(git: git, toolPaths: toolPaths)
+    isBusy = true
+    defer { isBusy = false }
+    do {
+      let moved = try await service.rename(
+        workspace: workspace,
+        to: newName,
+        root: library.workspaceRootURL,
+        library: library
+      )
+      await rescan()
+      selection = workspaces.first { $0.url.canonical == moved.canonical }?.url
+    } catch {
+      errorMessage = error.localizedDescription
+      await rescan()
+    }
   }
 
   func audit(_ workspace: Workspace) async -> [String: WorktreeRisk] {

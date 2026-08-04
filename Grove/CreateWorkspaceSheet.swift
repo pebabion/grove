@@ -45,6 +45,7 @@ struct CreateWorkspaceSheet: View {
           ForEach(model.library.repos) { repo in
             Toggle(isOn: binding(for: repo.name)) {
               HStack {
+                RepoSwatch(repo: repo.name)
                 Text(repo.name)
                 Spacer()
                 Text(repo.base)

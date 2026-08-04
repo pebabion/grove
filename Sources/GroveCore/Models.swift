@@ -23,6 +23,13 @@ public struct RepoEntry: Codable, Sendable, Hashable, Identifiable {
   /// did outside the worktree: containers, scratch databases, hosts entries.
   public var teardownCommand: String?
 
+  /// Which palette slot this repo uses.
+  ///
+  /// Assigned when the repo is added, taking the lowest slot nobody else holds.
+  /// Hashing the name was tried first and put three of five repos on the same
+  /// colour — with a handful of deliberately-added repos, picking beats guessing.
+  public var colorIndex: Int?
+
   public var id: String { name }
 
   public var url: URL { URL(filePath: (path as NSString).expandingTildeInPath) }
@@ -32,13 +39,15 @@ public struct RepoEntry: Codable, Sendable, Hashable, Identifiable {
     path: String,
     base: String = "origin/main",
     setupCommand: String? = nil,
-    teardownCommand: String? = nil
+    teardownCommand: String? = nil,
+    colorIndex: Int? = nil
   ) {
     self.name = name
     self.path = path
     self.base = base
     self.setupCommand = setupCommand
     self.teardownCommand = teardownCommand
+    self.colorIndex = colorIndex
   }
 }
 
@@ -82,6 +91,26 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
 
   public subscript(name: String) -> RepoEntry? {
     repos.first { $0.name == name }
+  }
+
+  /// How many colours the palette holds. The library declares it so both the
+  /// slot picker and the views agree.
+  public static let colorSlots = 12
+
+  /// Palette slot for a repo, falling back to its position in the library for
+  /// entries written before slots were recorded.
+  ///
+  /// Returns `nil` for a repo that is not in the library — a worktree found on
+  /// disk from a clone Grove does not know about.
+  public func colorIndex(for name: String) -> Int? {
+    guard let position = repos.firstIndex(where: { $0.name == name }) else { return nil }
+    return repos[position].colorIndex ?? position % Self.colorSlots
+  }
+
+  /// The lowest palette slot no repo currently holds.
+  public func nextColorIndex() -> Int {
+    let taken = Set(repos.indices.compactMap { repos[$0].colorIndex ?? $0 % Self.colorSlots })
+    return (0..<Self.colorSlots).first { !taken.contains($0) } ?? repos.count % Self.colorSlots
   }
 }
 
