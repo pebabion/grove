@@ -22,11 +22,15 @@ struct TerminalResizer: View {
         .contentShape(Rectangle())
     }
     .frame(height: 8)
+    // set() rather than push()/pop(): the pop never runs if the view disappears
+    // while the pointer is over it — collapsing the repo list does exactly that —
+    // and a cursor left on the stack overrides every cursor drawn after it,
+    // including the terminal's own.
     .onHover { inside in
       if inside {
-        NSCursor.resizeUpDown.push()
+        NSCursor.resizeUpDown.set()
       } else {
-        NSCursor.pop()
+        NSCursor.arrow.set()
       }
     }
     .gesture(
