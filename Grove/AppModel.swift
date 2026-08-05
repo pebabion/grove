@@ -22,6 +22,9 @@ final class AppModel {
   var busyLabel: String?
   var errorMessage: String?
 
+  /// False when the library file exists but could not be decoded.
+  private(set) var libraryIsReadable = true
+
   /// Keyed by `workspacePath|repoName` so two workspaces provisioning at once
   /// do not overwrite each other's progress.
   var activity: [String: RepoActivity] = [:]
@@ -141,7 +144,7 @@ final class AppModel {
 
   func load() async {
     toolPaths = await ToolPaths.discover()
-    library = (try? store.load(RepoLibrary.self, from: GroveLocations.libraryFile)) ?? RepoLibrary()
+    loadLibrary()
     // Turn an older "Zed" style name into the app it meant, so nobody has to
     // pick their editor a second time.
     let before = library
@@ -180,7 +183,28 @@ final class AppModel {
     isScanning = false
   }
 
+  /// Reads the library, keeping a failure to read distinct from an empty library.
+  ///
+  /// These were the same thing before, which is how a decoding bug showed up as
+  /// "no repos yet" — and would have written that emptiness back over a perfectly
+  /// good file the next time anything saved.
+  private func loadLibrary() {
+    do {
+      library = try store.load(RepoLibrary.self, from: GroveLocations.libraryFile) ?? RepoLibrary()
+      libraryIsReadable = true
+    } catch {
+      library = RepoLibrary()
+      libraryIsReadable = false
+      errorMessage =
+        "Could not read \(GroveLocations.libraryFile.path):\n\(error.localizedDescription)"
+        + "\n\nGrove will not overwrite it. Your repos and workspaces are untouched."
+    }
+  }
+
   func saveLibrary() {
+    // Refuse rather than replace a file that could not be read. Whatever is in the
+    // model right now is a default, not the user's settings.
+    guard libraryIsReadable else { return }
     saveTask?.cancel()
     saveTask = nil
     do {

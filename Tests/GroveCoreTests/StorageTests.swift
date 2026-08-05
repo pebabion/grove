@@ -86,3 +86,62 @@ struct StorageTests {
     #expect(!entry.url.path.contains("~"))
   }
 }
+
+@Suite("decoding older library files")
+struct LibraryDecodingTests {
+  private func decode(_ json: String) throws -> RepoLibrary {
+    try JSONDecoder().decode(RepoLibrary.self, from: Data(json.utf8))
+  }
+
+  @Test("reads a file written before a field existed")
+  func toleratesMissingFields() throws {
+    // Exactly what was on disk when toolOverrides was added. A default value on the
+    // property does not make Swift's decoder accept the key being absent, so this
+    // threw — and Grove showed no repos at all.
+    let library = try decode(
+      """
+      {
+        "workspaceRoot": "~/harmonic/worktrees",
+        "branchPrefix": "kelvin",
+        "repos": [{"name": "backend", "path": "~/harmonic/backend", "base": "origin/master"}]
+      }
+      """)
+
+    #expect(library.workspaceRoot == "~/harmonic/worktrees")
+    #expect(library.repos.map(\.name) == ["backend"])
+    #expect(library.toolOverrides.isEmpty)
+    #expect(library.terminalFont == nil)
+  }
+
+  @Test("reads a repo entry missing its base branch")
+  func toleratesMissingBase() throws {
+    let library = try decode(#"{"repos":[{"name":"x","path":"~/x"}]}"#)
+
+    #expect(library.repos.first?.base == "origin/main")
+  }
+
+  @Test("still refuses a file it cannot make sense of")
+  func rejectsNonsense() {
+    // A repo with no name is not a library with a default in it; it is broken, and
+    // saying so is what stops Grove overwriting a file it misread.
+    #expect(throws: (any Error).self) { try decode(#"{"repos":[{"path":"~/x"}]}"#) }
+    #expect(throws: (any Error).self) { try decode("not json") }
+  }
+
+  @Test("a round trip keeps everything")
+  func roundTrips() throws {
+    var original = RepoLibrary(
+      repos: [RepoEntry(name: "a", path: "~/a", colorIndex: 3)],
+      workspaceRoot: "~/w",
+      branchPrefix: "ada",
+      terminalFont: "Menlo",
+      terminalFontSize: 15
+    )
+    original.toolOverrides = ["gh": "/opt/gh"]
+
+    let data = try JSONEncoder().encode(original)
+    let decoded = try JSONDecoder().decode(RepoLibrary.self, from: data)
+
+    #expect(decoded == original)
+  }
+}

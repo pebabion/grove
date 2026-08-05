@@ -34,6 +34,22 @@ public struct RepoEntry: Codable, Sendable, Hashable, Identifiable {
 
   public var url: URL { URL(filePath: (path as NSString).expandingTildeInPath) }
 
+  enum CodingKeys: String, CodingKey {
+    case name, path, base, setupCommand, teardownCommand, colorIndex
+  }
+
+  /// Decoded field by field for the same reason as ``RepoLibrary``: a missing key
+  /// must not fail the whole file.
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    path = try container.decode(String.self, forKey: .path)
+    base = try container.decodeIfPresent(String.self, forKey: .base) ?? "origin/main"
+    setupCommand = try container.decodeIfPresent(String.self, forKey: .setupCommand)
+    teardownCommand = try container.decodeIfPresent(String.self, forKey: .teardownCommand)
+    colorIndex = try container.decodeIfPresent(Int.self, forKey: .colorIndex)
+  }
+
   public init(
     name: String,
     path: String,
@@ -109,6 +125,33 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.terminalFont = terminalFont
     self.terminalFontSize = terminalFontSize
     self.toolOverrides = toolOverrides
+  }
+
+  // Decoded field by field, every one optional.
+  //
+  // A default value on a property does not make Swift's synthesised decoder accept
+  // the key being absent — it throws. Adding `toolOverrides` therefore broke every
+  // library file already on disk: the load failed, Grove fell back to an empty
+  // library, and the user saw no repos at all. Any field added from here on must be
+  // decoded the same way.
+  enum CodingKeys: String, CodingKey {
+    case repos, workspaceRoot, editor, editorPath, terminalPath, branchPrefix
+    case terminalFont, terminalFontSize, toolOverrides
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    repos = try container.decodeIfPresent([RepoEntry].self, forKey: .repos) ?? []
+    workspaceRoot =
+      try container.decodeIfPresent(String.self, forKey: .workspaceRoot) ?? "~/worktrees"
+    editor = try container.decodeIfPresent(String.self, forKey: .editor)
+    editorPath = try container.decodeIfPresent(String.self, forKey: .editorPath)
+    terminalPath = try container.decodeIfPresent(String.self, forKey: .terminalPath)
+    branchPrefix = try container.decodeIfPresent(String.self, forKey: .branchPrefix)
+    terminalFont = try container.decodeIfPresent(String.self, forKey: .terminalFont)
+    terminalFontSize = try container.decodeIfPresent(Double.self, forKey: .terminalFontSize)
+    toolOverrides =
+      try container.decodeIfPresent([String: String].self, forKey: .toolOverrides) ?? [:]
   }
 
   /// Resolves the older `editor` name to a bundle path, once.
