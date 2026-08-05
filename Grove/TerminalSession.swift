@@ -28,7 +28,7 @@ final class TerminalSession: Identifiable {
   var onExit: (@MainActor () -> Void)?
 
   /// Retained deliberately. See the note on this type.
-  let view: LocalProcessTerminalView
+  let view: GroveTerminalView
 
   private let delegate = Delegate()
 
@@ -39,7 +39,7 @@ final class TerminalSession: Identifiable {
     self.id = worktree.path
     self.worktree = worktree
     self.repoName = repoName
-    self.view = LocalProcessTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
+    self.view = GroveTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
     self.view.font = font
 
     delegate.session = self

@@ -11,8 +11,8 @@ import SwiftUI
 struct TerminalViewBridge: NSViewRepresentable {
   let session: TerminalSession
 
-  func makeNSView(context: Context) -> LocalProcessTerminalView { session.view }
-  func updateNSView(_ view: LocalProcessTerminalView, context: Context) {}
+  func makeNSView(context: Context) -> GroveTerminalView { session.view }
+  func updateNSView(_ view: GroveTerminalView, context: Context) {}
 }
 
 /// A terminal for the workspace and one per repo, with a tab strip to choose.
