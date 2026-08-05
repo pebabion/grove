@@ -51,7 +51,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pebabion.Grove
         PRODUCT_NAME: Grove
-        MARKETING_VERSION: "0.5.0"
+        MARKETING_VERSION: "0.6.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
         ENABLE_HARDENED_RUNTIME: YES
