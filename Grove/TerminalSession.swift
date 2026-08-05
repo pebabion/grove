@@ -3,7 +3,7 @@ import GroveCore
 import SwiftTerm
 import SwiftUI
 
-/// A live shell running in one worktree.
+/// A live shell belonging to a workspace.
 ///
 /// The `NSView` is created once and held here, not built in `makeNSView`.
 /// SwiftUI rebuilds a representable's view whenever the surrounding state
@@ -13,18 +13,23 @@ import SwiftUI
 @Observable
 @MainActor
 final class TerminalSession: Identifiable {
-  let id: String
-  let worktree: URL
-  let repoName: String
+  let id = UUID()
+  /// The workspace this belongs under in the sidebar.
+  let workspace: URL
+  /// Where the shell was started.
+  let directory: URL
+  /// Shown until the program running says otherwise.
+  let fallbackName: String
 
-  /// Reported by the shell through the title escape sequence. Useful: a program
-  /// that sets it says what it is, so a busy session can be told from an idle one.
+  /// Whatever the running program set the terminal title to.
+  ///
+  /// This is how a session gets its name: `claude --name session_1` sets the title
+  /// to "✳ session_1", so the name the user chose arrives here without Grove having
+  /// to be told separately.
   var title: String = ""
   var hasExited = false
 
   /// Called once when the shell exits, so the owner can forget the session.
-  /// Without this, `exit` left a dead view on screen and the next redraw started
-  /// a replacement shell, which looked like nothing had happened.
   var onExit: (@MainActor () -> Void)?
 
   /// Retained deliberately. See the note on this type.
@@ -32,13 +37,30 @@ final class TerminalSession: Identifiable {
 
   private let delegate = Delegate()
 
+  /// The name to show: what the program calls itself, else where it is running.
+  var displayName: String {
+    let stripped = Self.strippingDecoration(title)
+    return stripped.isEmpty ? fallbackName : stripped
+  }
+
+  /// Removes the status glyph and padding a TUI puts in front of its title.
+  ///
+  /// Claude Code writes "✳ session_1"; the glyph is decoration, the name is not.
+  static func strippingDecoration(_ title: String) -> String {
+    let cleaned = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let scalars = cleaned.unicodeScalars.drop { scalar in
+      !(CharacterSet.alphanumerics.contains(scalar) || scalar == "/" || scalar == "~")
+    }
+    return String(String.UnicodeScalarView(scalars)).trimmingCharacters(in: .whitespaces)
+  }
+
   init(
-    worktree: URL, repoName: String, environment: [String: String], shell: String,
-    font: NSFont, foreground: NSColor
+    workspace: URL, directory: URL, fallbackName: String, environment: [String: String],
+    shell: String, font: NSFont, foreground: NSColor
   ) {
-    self.id = worktree.path
-    self.worktree = worktree
-    self.repoName = repoName
+    self.workspace = workspace
+    self.directory = directory
+    self.fallbackName = fallbackName
     self.view = GroveTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
     self.view.font = font
     self.view.nativeForegroundColor = foreground
@@ -58,7 +80,7 @@ final class TerminalSession: Identifiable {
       args: ["-l"],
       environment: variables.map { "\($0.key)=\($0.value)" },
       execName: nil,
-      currentDirectory: worktree.path
+      currentDirectory: directory.path
     )
   }
 
@@ -114,78 +136,70 @@ final class TerminalSession: Identifiable {
   }
 }
 
-/// Every live shell, keyed by the worktree it runs in.
+/// Every live shell, in the order they were started.
 ///
-/// Sessions outlive navigating away from a workspace: the point of a terminal is
-/// that a dev server or an agent keeps running while you look at something else.
-/// They do not outlive quitting Grove — that needs tmux, and pretending otherwise
-/// would be a lie.
+/// A workspace can have several: one per agent, or one per repo, or both. They
+/// outlive navigating away, which is the point — something long-running keeps going
+/// while you look elsewhere. They do not outlive quitting Grove, and there is no
+/// honest way to make them.
 @Observable
 @MainActor
 final class TerminalSessions {
-  private(set) var sessions: [String: TerminalSession] = [:]
+  private(set) var sessions: [TerminalSession] = []
 
   /// The shell to run. See ``UserShell`` for why the environment is not trusted.
   private var loginShell: String { UserShell.path }
 
-  func existing(at directory: URL) -> TerminalSession? {
-    guard let session = sessions[directory.path], !session.hasExited else { return nil }
-    return session
+  func sessions(in workspace: URL) -> [TerminalSession] {
+    sessions.filter { $0.workspace == workspace && !$0.hasExited }
   }
 
-  /// Starts a shell in `directory`, or returns the one already there.
-  ///
-  /// Only ever called from an explicit action — opening the pane or picking a tab.
-  /// Creating sessions from a view body meant a shell that had just exited was
-  /// replaced on the very next redraw.
+  func session(id: UUID) -> TerminalSession? {
+    sessions.first { $0.id == id && !$0.hasExited }
+  }
+
+  /// Starts a shell. Every call makes a new session, so one workspace can hold
+  /// several at once.
   @discardableResult
   func start(
-    at directory: URL, label: String, environment: [String: String], font: NSFont,
-    foreground: NSColor
+    in workspace: URL, directory: URL, fallbackName: String,
+    environment: [String: String], font: NSFont, foreground: NSColor
   ) -> TerminalSession? {
     guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
-    if let existing = existing(at: directory) { return existing }
 
     let session = TerminalSession(
-      worktree: directory,
-      repoName: label,
+      workspace: workspace,
+      directory: directory,
+      fallbackName: fallbackName,
       environment: environment,
       shell: loginShell,
       font: font,
       foreground: foreground
     )
-    session.onExit = { [weak self] in
-      self?.sessions.removeValue(forKey: directory.path)
+    session.onExit = { [weak self, id = session.id] in
+      self?.sessions.removeAll { $0.id == id }
     }
-    sessions[directory.path] = session
+    sessions.append(session)
     return session
   }
 
-  func isRunning(at directory: URL) -> Bool {
-    guard let session = sessions[directory.path] else { return false }
-    return !session.hasExited
-  }
-
-  func close(at directory: URL) {
-    sessions.removeValue(forKey: directory.path)?.terminate()
+  func close(id: UUID) {
+    guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+    sessions[index].terminate()
+    sessions.remove(at: index)
   }
 
   /// Restyles every live shell.
   ///
   /// Setting the font on a running view is enough — SwiftTerm rebuilds its metrics
   /// and reports the new cell size to the PTY, so anything full-screen redraws to
-  /// fit. Without this, a change in Settings only reached the next shell started.
+  /// fit.
   func applyFont(_ font: NSFont) {
-    for session in sessions.values {
-      session.view.font = font
-    }
+    for session in sessions { session.view.font = font }
   }
 
-  /// Recolours the shells already running.
   func applyForeground(_ color: NSColor) {
-    for session in sessions.values {
-      session.view.nativeForegroundColor = color
-    }
+    for session in sessions { session.view.nativeForegroundColor = color }
   }
 
   /// Ends every session inside a directory that is about to disappear.
@@ -194,9 +208,12 @@ final class TerminalSessions {
   /// deleted working directory, and anything it launched still running.
   func closeAll(under directory: URL) {
     let prefix = directory.path.hasSuffix("/") ? directory.path : directory.path + "/"
-    for (path, session) in sessions where path == directory.path || path.hasPrefix(prefix) {
+    for session in sessions
+    where session.directory.path == directory.path || session.directory.path.hasPrefix(prefix) {
       session.terminate()
-      sessions.removeValue(forKey: path)
+    }
+    sessions.removeAll {
+      $0.directory.path == directory.path || $0.directory.path.hasPrefix(prefix)
     }
   }
 }

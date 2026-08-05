@@ -53,13 +53,14 @@ final class AppModel {
   /// Live shells, one per worktree. Held here so they survive navigating away.
   let terminals = TerminalSessions()
 
-  /// Which workspaces have their terminal pane open, and which tab each is on.
+  /// Which workspaces have their terminal pane open, and which session each is
+  /// showing.
   ///
   /// Kept here rather than as view state: SwiftUI discards a detail view's state
   /// when the selection changes, so an open terminal appeared to vanish on coming
   /// back to a workspace even though its shell was still running.
   var terminalWorkspaces: Set<URL> = []
-  var terminalTabs: [URL: String] = [:]
+  var activeSessions: [URL: UUID] = [:]
 
   /// How tall the terminal pane is when it shares the window with the repo list.
   /// Dragged by the divider between them, and kept for the same reason the rest of
@@ -72,26 +73,42 @@ final class AppModel {
 
   /// What ⌘ + J will do next, for the menu item to say.
   var terminalCommandTitle: String {
-    guard let workspace = selectedWorkspace else { return "Show Terminal" }
-    guard terminalWorkspaces.contains(workspace.url) else { return "Show Terminal" }
-    return terminals.existing(at: currentTerminalDirectory(for: workspace)) == nil
-      ? "Start Shell" : "Hide Terminal"
+    guard let workspace = selectedWorkspace,
+      terminalWorkspaces.contains(workspace.url)
+    else { return "Show Terminal" }
+    return terminals.sessions(in: workspace.url).isEmpty ? "Start Session" : "Hide Terminal"
   }
 
-  /// The directory the workspace's front tab points at. Tabs are keyed by path, so
-  /// the tab is the directory.
-  private func currentTerminalDirectory(for workspace: Workspace) -> URL {
-    guard let path = terminalTabs[workspace.url] else { return workspace.url }
-    return URL(filePath: path)
+  /// The session a workspace is showing, if it still exists.
+  func activeSession(in workspace: Workspace) -> TerminalSession? {
+    guard let id = activeSessions[workspace.url] else { return nil }
+    return terminals.session(id: id)
   }
 
-  /// Shows the terminal, starts a shell in it, or hides it — whichever is the
-  /// sensible next step.
+  func selectSession(_ session: TerminalSession) {
+    activeSessions[session.workspace] = session.id
+    session.focus()
+  }
+
+  /// Starts a session in `directory` and brings it to the front.
+  @discardableResult
+  func startSession(in workspace: Workspace, at directory: URL) -> TerminalSession? {
+    let session = terminals.start(
+      in: workspace.url,
+      directory: directory,
+      fallbackName: directory == workspace.url ? "workspace" : directory.lastPathComponent,
+      environment: toolPaths.processEnvironment(),
+      font: terminalFont,
+      foreground: terminalForeground
+    )
+    if let session { selectSession(session) }
+    return session
+  }
+
+  /// Shows the terminal, starts a session, or hides it — whichever comes next.
   ///
   /// On the model rather than the view so the menu can drive it whatever has focus,
-  /// including the terminal itself. Pressing it on a tab whose shell has exited
-  /// starts another rather than hiding a pane with nothing in it, which is what
-  /// "Start a shell here" does when clicked.
+  /// including the terminal itself.
   func toggleTerminal() {
     guard let workspace = selectedWorkspace else { return }
 
@@ -99,26 +116,11 @@ final class AppModel {
       terminalWorkspaces.insert(workspace.url)
       return
     }
-
-    let directory = currentTerminalDirectory(for: workspace)
-    if terminals.existing(at: directory) == nil {
-      startTerminal(at: directory)
+    if terminals.sessions(in: workspace.url).isEmpty {
+      startSession(in: workspace, at: workspace.url)
     } else {
       terminalWorkspaces.remove(workspace.url)
     }
-  }
-
-  @discardableResult
-  func startTerminal(at directory: URL) -> TerminalSession? {
-    let session = terminals.start(
-      at: directory,
-      label: directory.lastPathComponent,
-      environment: toolPaths.processEnvironment(),
-      font: terminalFont,
-      foreground: terminalForeground
-    )
-    session?.focus()
-    return session
   }
 
   /// Restyles the shells already running, after a change in Settings.
@@ -423,7 +425,7 @@ final class AppModel {
       // working directory that no longer exists.
       terminals.closeAll(under: workspace.url)
       terminalWorkspaces.remove(workspace.url)
-      terminalTabs.removeValue(forKey: workspace.url)
+      activeSessions.removeValue(forKey: workspace.url)
 
       let moved = try await service.rename(
         workspace: workspace,
@@ -469,7 +471,7 @@ final class AppModel {
     do {
       terminals.closeAll(under: workspace.url)
       terminalWorkspaces.remove(workspace.url)
-      terminalTabs.removeValue(forKey: workspace.url)
+      activeSessions.removeValue(forKey: workspace.url)
       try await service.teardown(
         workspace: workspace,
         library: library,

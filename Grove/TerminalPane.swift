@@ -15,40 +15,17 @@ struct TerminalViewBridge: NSViewRepresentable {
   func updateNSView(_ view: GroveTerminalView, context: Context) {}
 }
 
-/// A terminal for the workspace and one per repo, with a tab strip to choose.
+/// The workspace's sessions, with a tab each and a way to start more.
 struct TerminalPane: View {
   @Environment(AppModel.self) private var model
   let workspace: Workspace
-  /// Cleared when the last shell exits, so `exit` puts the window back.
+  /// Cleared when the last session ends, so `exit` puts the window back.
   @Binding var showing: Bool
 
-  /// Also in the model, so returning to a workspace lands on the tab you left.
-  private var selected: String? {
-    get { model.terminalTabs[workspace.url] }
-    nonmutating set { model.terminalTabs[workspace.url] = newValue }
-  }
+  private var sessions: [TerminalSession] { model.terminals.sessions(in: workspace.url) }
 
-  /// Somewhere a shell can run: the workspace itself, or one of its worktrees.
-  private struct Target: Identifiable {
-    let label: String
-    let url: URL
-    /// Repos carry their colour; the workspace root gets a folder icon instead.
-    let repoName: String?
-    var id: String { url.path }
-  }
-
-  private var targets: [Target] {
-    // The workspace root first, since it is the sensible default for anything
-    // touching more than one repo.
-    var all = [Target(label: "workspace", url: workspace.url, repoName: nil)]
-    all += workspace.members
-      .filter { $0.state != .pending }
-      .map { Target(label: $0.repoName, url: $0.url, repoName: $0.repoName) }
-    return all
-  }
-
-  private var current: Target? {
-    targets.first { $0.id == selected } ?? targets.first
+  private var current: TerminalSession? {
+    model.activeSession(in: workspace) ?? sessions.first
   }
 
   var body: some View {
@@ -58,67 +35,64 @@ struct TerminalPane: View {
       terminal
     }
     .background(Color(nsColor: .textBackgroundColor))
-    .task(id: current?.id) {
-      // Only on open or on picking a tab. Starting from the body would resurrect
-      // a shell the moment it exited.
-      guard let target = current else { return }
-      // Opening a terminal, or picking a tab, means wanting to type in it.
-      model.startTerminal(at: target.url)
+    .task(id: sessions.isEmpty) {
+      // One session to begin with, in the workspace root. Starting from the body
+      // would resurrect a shell the moment it exited.
+      if sessions.isEmpty { model.startSession(in: workspace, at: workspace.url) }
     }
-    .onChange(of: liveSessions) { _, live in
-      // `exit` in the last tab means the pane has nothing left to show.
-      if live == 0 { showing = false }
+    .onChange(of: sessions.count) { _, count in
+      if count == 0 { showing = false }
     }
-  }
-
-  /// How many of this workspace's tabs have a shell in them.
-  private var liveSessions: Int {
-    targets.count { model.terminals.isRunning(at: $0.url) }
   }
 
   private var tabStrip: some View {
     HStack(spacing: 4) {
-      ForEach(targets) { target in
+      ForEach(sessions) { session in
         Button {
-          selected = target.id
+          model.selectSession(session)
         } label: {
           HStack(spacing: 5) {
-            if let repo = target.repoName {
-              RepoSwatch(repo: repo, size: 7)
-            } else {
-              Image(systemName: "folder")
-                .font(.caption2)
-            }
-            Text(target.label)
+            RepoSwatch(repo: session.fallbackName, size: 7)
+            Text(session.displayName)
               .font(.caption)
-            // A filled dot means a shell is alive in there, which matters when
-            // deciding whether closing it will interrupt something.
-            if model.terminals.isRunning(at: target.url) {
-              Circle()
-                .fill(.green)
-                .frame(width: 5, height: 5)
-            }
+              .lineLimit(1)
           }
           .padding(.horizontal, 8)
           .padding(.vertical, 4)
           .background(
-            target.id == current?.id ? Color.accentColor.opacity(0.25) : .clear,
+            session.id == current?.id ? Color.accentColor.opacity(0.25) : .clear,
             in: Capsule()
           )
         }
         .buttonStyle(.plain)
+        .help("Started in \(session.directory.lastPathComponent)")
       }
+
+      // Where a session comes from: the workspace itself, or one of its repos.
+      Menu {
+        Button("Workspace") { model.startSession(in: workspace, at: workspace.url) }
+        ForEach(workspace.members.filter { $0.state != .pending }) { member in
+          Button(member.repoName) { model.startSession(in: workspace, at: member.url) }
+        }
+      } label: {
+        Image(systemName: "plus")
+          .font(.caption)
+      }
+      .menuStyle(.borderlessButton)
+      .menuIndicator(.hidden)
+      .fixedSize()
+      .help("Start another session")
 
       Spacer()
 
-      if let target = current, model.terminals.isRunning(at: target.url) {
+      if let session = current {
         Button {
-          model.terminals.close(at: target.url)
+          model.terminals.close(id: session.id)
         } label: {
           Image(systemName: "xmark.circle")
         }
         .buttonStyle(.borderless)
-        .help("End the shell in \(target.label)")
+        .help("End \(session.displayName)")
       }
     }
     .padding(.horizontal, 8)
@@ -127,9 +101,7 @@ struct TerminalPane: View {
 
   @ViewBuilder
   private var terminal: some View {
-    if let target = current, let session = model.terminals.existing(at: target.url) {
-      // Identified by directory so switching tabs swaps views rather than reusing
-      // one and rewiring it.
+    if let session = current {
       // Padded, with the gap filled by the terminal's own background so it reads
       // as breathing room inside the terminal rather than a border around it.
       TerminalViewBridge(session: session)
@@ -137,10 +109,8 @@ struct TerminalPane: View {
         .padding(10)
         .background(Color(nsColor: session.view.nativeBackgroundColor))
     } else {
-      // Reached after `exit` in a tab that is not the last one.
-      Button("Start a shell here (⌘ + J)") {
-        guard let target = current else { return }
-        model.startTerminal(at: target.url)
+      Button("Start a session (⌘ + J)") {
+        model.startSession(in: workspace, at: workspace.url)
       }
       .buttonStyle(.link)
       .frame(maxWidth: .infinity, maxHeight: .infinity)

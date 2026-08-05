@@ -272,8 +272,48 @@ struct WorkspaceRow: View {
           }
         }
       }
+
+      sessionRows
     }
     .padding(.vertical, 3)
+  }
+
+  /// The workspace's live sessions, named by whatever is running in them.
+  ///
+  /// `claude --name session_1` sets the terminal title, which is where the name
+  /// comes from — so a session announces itself rather than needing to be labelled.
+  @ViewBuilder
+  private var sessionRows: some View {
+    let sessions = model.terminals.sessions(in: workspace.url)
+    if !sessions.isEmpty {
+      VStack(alignment: .leading, spacing: 2) {
+        ForEach(sessions) { session in
+          Button {
+            model.selection = workspace.url
+            model.terminalWorkspaces.insert(workspace.url)
+            model.selectSession(session)
+          } label: {
+            HStack(spacing: 5) {
+              Image(systemName: "terminal")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+              Text(session.displayName)
+                .font(.caption)
+                .lineLimit(1)
+                .truncationMode(.tail)
+              Spacer(minLength: 0)
+            }
+            .padding(.vertical, 1)
+            .contentShape(Rectangle())
+            .foregroundStyle(
+              model.activeSessions[workspace.url] == session.id ? .primary : .secondary)
+          }
+          .buttonStyle(.plain)
+        }
+      }
+      .padding(.leading, 2)
+      .padding(.top, 2)
+    }
   }
 }
 
