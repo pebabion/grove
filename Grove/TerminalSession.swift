@@ -43,6 +43,13 @@ final class TerminalSession: Identifiable {
     // terminal can do colour and cursor addressing.
     variables["TERM"] = "xterm-256color"
     variables["COLORTERM"] = "truecolor"
+    // Say which terminal this is, as every terminal should. Without it the shell
+    // inherits whatever launched Grove — so a Grove session started from Ghostty
+    // would claim to be Ghostty, and anything keying features off this would
+    // guess wrong.
+    variables["TERM_PROGRAM"] = "Grove"
+    variables["TERM_PROGRAM_VERSION"] =
+      Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     // Programs that shell out to an editor should not open one inside themselves.
     variables.removeValue(forKey: "EDITOR")
 
