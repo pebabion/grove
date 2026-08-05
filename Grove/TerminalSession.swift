@@ -103,10 +103,8 @@ final class TerminalSession: Identifiable {
 final class TerminalSessions {
   private(set) var sessions: [String: TerminalSession] = [:]
 
-  /// The shell to run, from the user's own environment.
-  private var loginShell: String {
-    ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-  }
+  /// The shell to run. See ``UserShell`` for why the environment is not trusted.
+  private var loginShell: String { UserShell.path }
 
   func session(for member: WorkspaceMember, environment: [String: String]) -> TerminalSession? {
     guard FileManager.default.fileExists(atPath: member.url.path) else { return nil }
