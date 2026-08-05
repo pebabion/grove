@@ -81,7 +81,7 @@ struct WorkspaceDetail: View {
         }
         .help(
           showingTerminal
-            ? "Hide the terminal (⌘J)" : "Open a terminal in this workspace (⌘J)")
+            ? "Hide the terminal (⌘ + J)" : "Open a terminal in this workspace (⌘ + J)")
 
         Menu {
           WorkspaceActions(workspace: workspace)

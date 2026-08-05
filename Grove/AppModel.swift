@@ -59,7 +59,7 @@ final class AppModel {
   /// workspace — it is a preference about the layout, not about a workspace.
   var detailsCollapsed = false
 
-  /// What ⌘J will do next, for the menu item to say.
+  /// What ⌘ + J will do next, for the menu item to say.
   var terminalCommandTitle: String {
     guard let workspace = selectedWorkspace else { return "Show Terminal" }
     guard terminalWorkspaces.contains(workspace.url) else { return "Show Terminal" }

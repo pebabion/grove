@@ -138,7 +138,7 @@ struct TerminalPane: View {
         .background(Color(nsColor: session.view.nativeBackgroundColor))
     } else {
       // Reached after `exit` in a tab that is not the last one.
-      Button("Start a shell here (⌘J)") {
+      Button("Start a shell here (⌘ + J)") {
         guard let target = current else { return }
         model.startTerminal(at: target.url)
       }

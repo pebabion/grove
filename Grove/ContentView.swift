@@ -27,27 +27,6 @@ struct ContentView: View {
         emptyDetail
       }
     }
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          showingCreate = true
-        } label: {
-          Label("New Workspace", systemImage: "plus")
-        }
-        .disabled(model.library.repos.isEmpty)
-        .help(
-          model.library.repos.isEmpty
-            ? "Add a repo in Settings first" : "Create a workspace")
-      }
-      ToolbarItem {
-        Button {
-          Task { await model.rescan() }
-        } label: {
-          Label("Rescan", systemImage: "arrow.clockwise")
-        }
-        .disabled(model.isScanning)
-      }
-    }
     // An explicit minimum is what lets the scene's .defaultSize take effect. With
     // no frame here a NavigationSplitView reports its own size and the window
     // adopts that instead, which is how .defaultSize came to be ignored.
@@ -105,6 +84,28 @@ struct ContentView: View {
         .padding(24)
       } else if model.workspaces.isEmpty {
         sidebarEmptyState
+      }
+    }
+    // Over the sidebar, not the detail pane: these act on the list of workspaces,
+    // while Open, Terminal and the rest act on the one workspace being shown.
+    .toolbar {
+      ToolbarItemGroup(placement: .navigation) {
+        Button {
+          showingCreate = true
+        } label: {
+          Label("New Workspace", systemImage: "plus")
+        }
+        .disabled(model.library.repos.isEmpty)
+        .help(
+          model.library.repos.isEmpty ? "Add a repo in Settings first" : "New workspace (⌘ + N)")
+
+        Button {
+          Task { await model.rescan() }
+        } label: {
+          Label("Rescan", systemImage: "arrow.clockwise")
+        }
+        .disabled(model.isScanning)
+        .help("Rescan every workspace (⌘ + R)")
       }
     }
     .safeAreaInset(edge: .bottom) {
@@ -187,7 +188,7 @@ struct ContentView: View {
       Text(
         model.library.repos.isEmpty
           ? "Add repositories in Settings, then create a workspace."
-          : "Press ⌘N to create one."
+          : "Press ⌘ + N to create one."
       )
       .font(.caption)
       .multilineTextAlignment(.center)
