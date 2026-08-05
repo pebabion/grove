@@ -124,7 +124,12 @@ struct ContentView: View {
   private var footer: some View {
     HStack(spacing: 6) {
       Group {
-        if model.isScanning {
+        if let busy = model.busyLabel {
+          ProgressView().controlSize(.small)
+          Text(busy)
+            .lineLimit(1)
+            .truncationMode(.tail)
+        } else if model.isScanning {
           ProgressView().controlSize(.small)
           Text("Scanning…")
         } else if model.isMeasuring {

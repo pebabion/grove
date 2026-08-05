@@ -18,6 +18,8 @@ final class AppModel {
   var selection: URL?
   var isScanning = false
   var isBusy = false
+  /// What the busy work is, for the footer to name.
+  var busyLabel: String?
   var errorMessage: String?
 
   /// Keyed by `workspacePath|repoName` so two workspaces provisioning at once
@@ -150,8 +152,36 @@ final class AppModel {
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     let root = library.workspaceRootURL
 
+    let expected = root.appending(path: WorkspaceNaming.slug(name))
+
+    // Put the workspace on screen and select it before any of the slow work
+    // starts. Creating one runs a fetch, a worktree add and then a dependency
+    // install per repo, which is minutes; waiting for all of that before the
+    // rescan meant the only sign anything was happening was a greyed-out button,
+    // and the per-repo progress had nowhere to appear because the workspace was
+    // not selectable yet.
+    let placeholder = Workspace(
+      url: expected,
+      file: WorkspaceFile(name: name, branch: branch, repos: repos.map(\.name)),
+      members: repos.map {
+        WorkspaceMember(
+          repoName: $0.name,
+          url: expected.appending(path: $0.name),
+          branch: branch,
+          state: .pending
+        )
+      }
+    )
+    workspaces.append(placeholder)
+    sortWorkspaces()
+    selection = expected
+
     isBusy = true
-    defer { isBusy = false }
+    busyLabel = "Creating \(WorkspaceNaming.slug(name))"
+    defer {
+      isBusy = false
+      busyLabel = nil
+    }
 
     do {
       try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -163,7 +193,7 @@ final class AppModel {
         link: nil,
         repos: repos,
         in: root,
-        onUpdate: handler(forWorkspaceAt: root.appending(path: WorkspaceNaming.slug(name)))
+        onUpdate: handler(forWorkspaceAt: expected)
       )
       await rescan()
       selection = created
@@ -174,8 +204,14 @@ final class AppModel {
       }
     } catch {
       errorMessage = error.localizedDescription
+      // Take the placeholder away again: nothing was created.
+      workspaces.removeAll { $0.url == expected }
       await rescan()
     }
+  }
+
+  private func sortWorkspaces() {
+    workspaces.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
   }
 
   func addRepo(named repoName: String, to workspace: Workspace) async {

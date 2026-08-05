@@ -98,11 +98,20 @@ public struct WorkspaceService: Sendable {
       to: workspace.appending(path: GroveLocations.workspaceFileName)
     )
 
+    // Fetch every repo at once. Fetching does not take the worktree lock, so
+    // doing them one at a time only added a second or two per repo before
+    // anything at all appeared on screen.
+    await withTaskGroup(of: Void.self) { group in
+      for repo in repos {
+        group.addTask { [git] in
+          onUpdate(ProvisionUpdate(repo: repo.name, state: .settingUp, detail: "Fetching"))
+          try? await git.fetch(repo: repo.url)
+        }
+      }
+    }
+
     var created: [RepoEntry] = []
     for repo in repos {
-      onUpdate(ProvisionUpdate(repo: repo.name, state: .settingUp, detail: "Fetching"))
-      try? await git.fetch(repo: repo.url)
-
       onUpdate(ProvisionUpdate(repo: repo.name, state: .settingUp, detail: "Creating worktree"))
       do {
         try await git.addWorktree(
