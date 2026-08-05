@@ -127,8 +127,12 @@ struct TerminalPane: View {
     if let target = current, let session = model.terminals.existing(at: target.url) {
       // Identified by directory so switching tabs swaps views rather than reusing
       // one and rewiring it.
+      // Padded, with the gap filled by the terminal's own background so it reads
+      // as breathing room inside the terminal rather than a border around it.
       TerminalViewBridge(session: session)
         .id(session.id)
+        .padding(10)
+        .background(Color(nsColor: session.view.nativeBackgroundColor))
     } else {
       // Reached after `exit` in a tab that is not the last one.
       Button("Start a shell here") {
