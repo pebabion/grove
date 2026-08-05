@@ -158,9 +158,7 @@ final class AppModel {
     let workspace = session.workspace.lastPathComponent
     let name = session.displayName
     let id = session.id
-    Task {
-      await notifier.post(signal, session: name, workspace: workspace, id: id, saying: saying)
-    }
+    notifier.post(signal, session: name, workspace: workspace, id: id, saying: saying)
   }
 
   /// Turns the Claude Code relay on or off, and reports what went wrong if it did.

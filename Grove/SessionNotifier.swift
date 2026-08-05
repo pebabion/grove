@@ -31,18 +31,34 @@ final class SessionNotifier {
     center.delegate = handler
   }
 
+  /// Posts a notification, asking permission first if it has not been asked yet.
+  ///
+  /// Completion handlers rather than the async API throughout. `UNUserNotificationCenter`
+  /// is not Sendable on every toolchain that builds this, so awaiting one of its
+  /// methods from the main actor counts as sending it across isolation and does not
+  /// compile — it built locally and failed in CI. Called this way it never leaves the
+  /// main actor at all.
   func post(
     _ signal: SessionSignal, session: String, workspace: String, id: UUID, saying: String? = nil
-  ) async {
+  ) {
     guard Self.isAvailable else {
       Log.sessions.problem("no bundle identifier, so notifications are unavailable")
       return
     }
-    guard await isAllowed() else {
-      Log.sessions.problem("not allowed to notify")
-      return
-    }
 
+    allowed { [weak self] granted in
+      guard let self else { return }
+      guard granted else {
+        Log.sessions.problem("not allowed to notify")
+        return
+      }
+      deliver(signal, session: session, workspace: workspace, id: id, saying: saying)
+    }
+  }
+
+  private func deliver(
+    _ signal: SessionSignal, session: String, workspace: String, id: UUID, saying: String?
+  ) {
     let content = UNMutableNotificationContent()
     content.title = session
     content.subtitle = workspace
@@ -65,27 +81,34 @@ final class SessionNotifier {
     // from sitting under Claude Code's more precise reason for the same moment.
     let request = UNNotificationRequest(
       identifier: id.uuidString, content: content, trigger: nil)
-    do {
-      try await center.add(request)
-      Log.sessions.note("posted for \(session)")
-    } catch {
-      Log.sessions.problem("posting failed: \(error.localizedDescription)")
+    center.add(request) { error in
+      if let error {
+        Task { @MainActor in
+          Log.sessions.problem("posting failed: \(error.localizedDescription)")
+        }
+      } else {
+        Task { @MainActor in Log.sessions.note("posted for \(session)") }
+      }
     }
   }
 
   /// Asks once, then remembers. Asking on every notification would be a sheet per
   /// turn until the user answered.
-  private func isAllowed() async -> Bool {
-    if let authorization { return authorization }
-    var granted = false
-    do {
-      granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
-    } catch {
-      Log.sessions.problem("asking permission failed: \(error.localizedDescription)")
+  private func allowed(_ done: @escaping @MainActor (Bool) -> Void) {
+    if let authorization {
+      done(authorization)
+      return
     }
-    Log.sessions.note("permission granted: \(granted)")
-    authorization = granted
-    return granted
+    center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+      Task { @MainActor in
+        if let error {
+          Log.sessions.problem("asking permission failed: \(error.localizedDescription)")
+        }
+        Log.sessions.note("permission granted: \(granted)")
+        self.authorization = granted
+        done(granted)
+      }
+    }
   }
 
   fileprivate func open(sessionID: String) {
