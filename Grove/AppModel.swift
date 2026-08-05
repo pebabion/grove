@@ -55,6 +55,11 @@ final class AppModel {
   var terminalWorkspaces: Set<URL> = []
   var terminalTabs: [URL: String] = [:]
 
+  /// How tall the terminal pane is when it shares the window with the repo list.
+  /// Dragged by the divider between them, and kept for the same reason the rest of
+  /// this is: switching workspaces should not reset it.
+  var terminalHeight: CGFloat = 320
+
   /// Whether the repo list is collapsed. One setting for the window, not per
   /// workspace — it is a preference about the layout, not about a workspace.
   var detailsCollapsed = false
@@ -116,6 +121,7 @@ final class AppModel {
 
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
+  private var saveTask: Task<Void, Never>?
 
   var git: Git? {
     guard let executable = toolPaths.location(of: "git") else { return nil }
@@ -143,6 +149,7 @@ final class AppModel {
     if library != before { saveLibrary() }
     // Cached sizes only. Measuring walks every file and takes tens of seconds,
     // so it never happens without being asked for.
+    applyToolOverrides()
     sizes = (try? store.load(SizeCache.self, from: SizeCache.fileURL)) ?? SizeCache()
     pullRequests =
       (try? store.load(PullRequestCache.self, from: PullRequestCache.fileURL))
@@ -174,11 +181,49 @@ final class AppModel {
   }
 
   func saveLibrary() {
+    saveTask?.cancel()
+    saveTask = nil
     do {
       try store.save(library, to: GroveLocations.libraryFile)
     } catch {
       errorMessage = "Could not save the library: \(error.localizedDescription)"
     }
+  }
+
+  /// Saves once the typing stops.
+  ///
+  /// Settings bound its fields straight to `saveLibrary`, which rewrote the whole
+  /// library file on every keystroke in a shell command.
+  func saveLibrarySoon() {
+    saveTask?.cancel()
+    saveTask = Task { [weak self] in
+      try? await Task.sleep(for: .milliseconds(600))
+      guard !Task.isCancelled else { return }
+      self?.saveLibrary()
+    }
+  }
+
+  /// Re-reads a repo's default branch from its remote.
+  func redetectBase(for name: String) async {
+    guard let git, let index = library.repos.firstIndex(where: { $0.name == name }) else { return }
+    let repo = library.repos[index]
+    guard let detected = (try? await git.defaultBranch(repo: repo.url)) ?? nil else {
+      errorMessage = "Could not read origin/HEAD for \(name). Is the remote reachable?"
+      return
+    }
+    library.repos[index].base = detected
+    saveLibrary()
+  }
+
+  /// Applies the stored tool overrides on top of whatever discovery found.
+  func applyToolOverrides() {
+    toolPaths.overrides = library.toolOverrides
+  }
+
+  /// Asks the login shell again where the tools are.
+  func reloadToolPaths() async {
+    toolPaths = await ToolPaths.discover()
+    applyToolOverrides()
   }
 
   // MARK: - Repo library

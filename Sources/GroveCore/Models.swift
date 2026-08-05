@@ -83,6 +83,12 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   public var terminalFont: String?
   public var terminalFontSize: Double?
 
+  /// Explicit paths for tools the login shell does not reveal, keyed by tool name.
+  ///
+  /// ``ToolPaths`` has always honoured overrides, but nothing set them and nothing
+  /// kept them, so anyone whose gh lived somewhere unusual had no way to say so.
+  public var toolOverrides: [String: String] = [:]
+
   public init(
     repos: [RepoEntry] = [],
     workspaceRoot: String = "~/worktrees",
@@ -91,7 +97,8 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalPath: String? = nil,
     branchPrefix: String? = nil,
     terminalFont: String? = nil,
-    terminalFontSize: Double? = nil
+    terminalFontSize: Double? = nil,
+    toolOverrides: [String: String] = [:]
   ) {
     self.repos = repos
     self.workspaceRoot = workspaceRoot
@@ -101,6 +108,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.branchPrefix = branchPrefix
     self.terminalFont = terminalFont
     self.terminalFontSize = terminalFontSize
+    self.toolOverrides = toolOverrides
   }
 
   /// Resolves the older `editor` name to a bundle path, once.

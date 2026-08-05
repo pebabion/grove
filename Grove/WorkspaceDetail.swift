@@ -44,9 +44,7 @@ struct WorkspaceDetail: View {
           .padding(24)
           .frame(maxWidth: .infinity, alignment: .leading)
         }
-        // Capped when sharing with a terminal, so the terminal gets the room.
-        .frame(maxHeight: showingTerminal ? 280 : .infinity)
-        if showingTerminal { Divider() }
+        .frame(maxHeight: .infinity)
       }
 
       if showingTerminal {
