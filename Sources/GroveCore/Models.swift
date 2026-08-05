@@ -112,6 +112,13 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// lets Grove tell "needs your input" from "finished".
   public var claudeHooks: Bool?
 
+  /// Whether programs in the terminal receive mouse events.
+  ///
+  /// Off by default, because it is what makes selecting text possible: SwiftTerm
+  /// discards the selection on every chunk of output while mouse reporting is
+  /// permitted, whether or not any program asked for the mouse.
+  public var terminalMouseReporting: Bool?
+
   /// Explicit paths for tools the login shell does not reveal, keyed by tool name.
   ///
   /// ``ToolPaths`` has always honoured overrides, but nothing set them and nothing
@@ -130,6 +137,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalForeground: String? = nil,
     notifySessionEvents: Bool? = nil,
     claudeHooks: Bool? = nil,
+    terminalMouseReporting: Bool? = nil,
     toolOverrides: [String: String] = [:]
   ) {
     self.repos = repos
@@ -143,6 +151,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.terminalForeground = terminalForeground
     self.notifySessionEvents = notifySessionEvents
     self.claudeHooks = claudeHooks
+    self.terminalMouseReporting = terminalMouseReporting
     self.toolOverrides = toolOverrides
   }
 
@@ -156,7 +165,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   enum CodingKeys: String, CodingKey {
     case repos, workspaceRoot, editor, editorPath, terminalPath, branchPrefix
     case terminalFont, terminalFontSize, terminalForeground
-    case notifySessionEvents, claudeHooks, toolOverrides
+    case notifySessionEvents, claudeHooks, terminalMouseReporting, toolOverrides
   }
 
   public init(from decoder: Decoder) throws {
@@ -173,6 +182,8 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalForeground = try container.decodeIfPresent(String.self, forKey: .terminalForeground)
     notifySessionEvents = try container.decodeIfPresent(Bool.self, forKey: .notifySessionEvents)
     claudeHooks = try container.decodeIfPresent(Bool.self, forKey: .claudeHooks)
+    terminalMouseReporting = try container.decodeIfPresent(
+      Bool.self, forKey: .terminalMouseReporting)
     toolOverrides =
       try container.decodeIfPresent([String: String].self, forKey: .toolOverrides) ?? [:]
   }

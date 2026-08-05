@@ -199,7 +199,8 @@ final class AppModel {
       fallbackName: directory == workspace.url ? "workspace" : directory.lastPathComponent,
       environment: toolPaths.processEnvironment(),
       font: terminalFont,
-      foreground: terminalForeground
+      foreground: terminalForeground,
+      mouseReporting: library.terminalMouseReporting ?? false
     )
     if let session { selectSession(session) }
     return session
@@ -230,6 +231,10 @@ final class AppModel {
 
   func applyTerminalForeground() {
     terminals.applyForeground(terminalForeground)
+  }
+
+  func applyTerminalMouseReporting() {
+    terminals.applyMouseReporting(library.terminalMouseReporting ?? false)
   }
 
   /// The colour embedded terminals draw default text in.

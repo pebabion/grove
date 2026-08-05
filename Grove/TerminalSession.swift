@@ -70,7 +70,7 @@ final class TerminalSession: Identifiable {
 
   init(
     workspace: URL, directory: URL, fallbackName: String, environment: [String: String],
-    shell: String, font: NSFont, foreground: NSColor
+    shell: String, font: NSFont, foreground: NSColor, mouseReporting: Bool
   ) {
     self.workspace = workspace
     self.directory = directory
@@ -78,6 +78,10 @@ final class TerminalSession: Identifiable {
     self.view = GroveTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
     self.view.font = font
     self.view.nativeForegroundColor = foreground
+    // Off unless asked for. SwiftTerm discards the selection on every chunk of output
+    // while this is on, whether or not a program ever asked for the mouse, so leaving
+    // it on means text cannot be selected at all.
+    self.view.allowMouseReporting = mouseReporting
 
     delegate.session = self
     view.processDelegate = delegate
@@ -206,7 +210,7 @@ final class TerminalSessions {
   @discardableResult
   func start(
     in workspace: URL, directory: URL, fallbackName: String,
-    environment: [String: String], font: NSFont, foreground: NSColor
+    environment: [String: String], font: NSFont, foreground: NSColor, mouseReporting: Bool
   ) -> TerminalSession? {
     guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
 
@@ -217,7 +221,8 @@ final class TerminalSessions {
       environment: environment,
       shell: loginShell,
       font: font,
-      foreground: foreground
+      foreground: foreground,
+      mouseReporting: mouseReporting
     )
     session.onExit = { [weak self, id = session.id] in
       self?.sessions.removeAll { $0.id == id }
@@ -249,6 +254,12 @@ final class TerminalSessions {
 
   func applyForeground(_ color: NSColor) {
     for session in sessions { session.view.nativeForegroundColor = color }
+  }
+
+  /// Changes it on the shells already running, so the setting takes effect without
+  /// starting a new session.
+  func applyMouseReporting(_ enabled: Bool) {
+    for session in sessions { session.view.allowMouseReporting = enabled }
   }
 
   /// Ends every session inside a directory that is about to disappear.

@@ -175,3 +175,18 @@ identifier, so a later signal replaces an earlier one instead of stacking.
 `rescan()` forces a pull request refresh. It used to refresh nothing, so a merged
 pull request kept showing as open until the next launch, and even then a fifteen
 minute cache could hold the stale answer. An explicit action must not serve a cache.
+
+## Selecting text in the terminal
+
+Mouse reporting is off by default, and that is what makes selection work.
+
+SwiftTerm discards the selection whenever mouse reporting is *permitted* — not when a
+program is actually using it. Both `linefeed` and `feedPrepare` clear it on that flag
+alone, so with reporting on, a selection survives until the next chunk of output:
+milliseconds in a live session. `feedPrepare` is internal, so overriding `linefeed`
+alone fixes nothing; the flag is the only lever.
+
+Nothing is lost by default. Claude Code sets no mouse tracking mode at all — measured
+through a PTY, it sets only focus reporting, bracketed paste and synchronised output —
+and neither does a shell. The setting exists for programs that do read the mouse, such
+as vim or lazygit.

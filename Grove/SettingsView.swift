@@ -461,6 +461,30 @@ struct TerminalSettings: View {
       }
 
       Section {
+        Toggle(
+          "Send mouse events to programs",
+          isOn: Binding(
+            get: { model.library.terminalMouseReporting ?? false },
+            set: {
+              model.library.terminalMouseReporting = $0
+              model.saveLibrary()
+              model.applyTerminalMouseReporting()
+            })
+        )
+      } header: {
+        Text("Mouse")
+      } footer: {
+        Text(
+          "Leave this off to select text. SwiftTerm throws the selection away on every "
+            + "chunk of output while mouse events are being sent, so a selection lasts "
+            + "only until the next line prints. Turn it on for programs that read the "
+            + "mouse themselves, such as vim or lazygit — Claude Code does not."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
+      Section {
         ColorPicker(
           "Text",
           selection: Binding(
