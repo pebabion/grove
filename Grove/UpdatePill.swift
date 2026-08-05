@@ -35,7 +35,7 @@ struct UpdatePill: View {
     .help("Running \(model.currentVersion) · installs \(update.version) and restarts")
     .contextMenu {
       Link("What's new in \(update.version.description)", destination: update.pageURL)
-      Button("Dismiss") { model.availableUpdate = nil }
+      Button("Dismiss") { model.dismissUpdate() }
     }
   }
 

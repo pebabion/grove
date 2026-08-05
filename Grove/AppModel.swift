@@ -44,6 +44,9 @@ final class AppModel {
 
   /// A newer release than this build, once one is known.
   var availableUpdate: AvailableUpdate?
+  /// A version the user waved away. Kept so a five-minute check does not bring it
+  /// straight back.
+  private var dismissedVersion: SemanticVersion?
   var isDownloadingUpdate = false
   var updateStage: UpdateStage?
 
@@ -140,6 +143,7 @@ final class AppModel {
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
   private var saveTask: Task<Void, Never>?
+  private var updateTask: Task<Void, Never>?
 
   var git: Git? {
     guard let executable = toolPaths.location(of: "git") else { return nil }
@@ -180,6 +184,7 @@ final class AppModel {
     Task { await refreshPullRequests() }
     Task { await checkForUpdate() }
     startBackgroundMeasurement()
+    startUpdateChecks()
   }
 
   func rescan() async {
@@ -498,8 +503,38 @@ final class AppModel {
     Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
   }
 
+  /// How often to ask GitHub. Twelve requests an hour against an unauthenticated
+  /// limit of sixty, so there is room to spare.
+  static let updateCheckInterval: Duration = .seconds(300)
+
+  /// Asks on its own timer rather than riding along with the disk sweep, which tied
+  /// the two intervals together for no reason.
+  func startUpdateChecks() {
+    updateTask?.cancel()
+    updateTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: Self.updateCheckInterval)
+        guard !Task.isCancelled, let self else { return }
+        await self.checkForUpdate()
+      }
+    }
+  }
+
   func checkForUpdate() async {
-    availableUpdate = await UpdateChecker().check(against: currentVersion)
+    guard let found = await UpdateChecker().check(against: currentVersion) else {
+      // A nil answer covers both "already current" and "could not ask", so it must
+      // not clear a pill already on screen — checking every five minutes would
+      // otherwise make one network blip look like the update going away.
+      return
+    }
+    guard found.version != dismissedVersion else { return }
+    availableUpdate = found
+  }
+
+  /// Dismissing hides one particular version, not the pill for five minutes.
+  func dismissUpdate() {
+    dismissedVersion = availableUpdate?.version
+    availableUpdate = nil
   }
 
   /// What the update is doing, for the pill to say.
@@ -673,15 +708,10 @@ final class AppModel {
   func startBackgroundMeasurement() {
     sweepTask?.cancel()
     sweepTask = Task { [weak self] in
-      var sweeps = 0
       while !Task.isCancelled {
         try? await Task.sleep(for: Self.sweepInterval)
         guard !Task.isCancelled, let self else { return }
         await self.measureStale()
-        // Every twelfth sweep is roughly six hours. Releases are not frequent
-        // enough to justify asking more often than that.
-        sweeps += 1
-        if sweeps % 12 == 0 { await self.checkForUpdate() }
       }
     }
   }
