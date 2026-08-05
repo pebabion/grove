@@ -8,6 +8,7 @@ struct WorkspaceDetail: View {
   @State private var expandedLogs: Set<String> = []
   @State private var showingTerminal = false
   @State private var showingDetails = true
+  @State private var hoveringSummary = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -71,39 +72,51 @@ struct WorkspaceDetail: View {
     }
   }
 
-  /// Name, branch and size on one line, with a disclosure for the rest.
+  /// Name, branch and size on one line, and the whole row toggles the rest.
+  ///
+  /// The chevron alone was the hit target before, which is a few points across and
+  /// gave no sign it could be clicked. A disclosure row should be as wide as the
+  /// row, and should say so on hover.
   private var summaryBar: some View {
-    HStack(spacing: 8) {
-      Button {
-        showingDetails.toggle()
-      } label: {
-        Image(systemName: showingDetails ? "chevron.down" : "chevron.right")
-          .font(.caption)
+    Button {
+      showingDetails.toggle()
+    } label: {
+      HStack(spacing: 8) {
+        Image(systemName: "chevron.right")
+          .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(.secondary)
-      }
-      .buttonStyle(.plain)
-      .help(showingDetails ? "Hide the repo list" : "Show the repo list")
+          .rotationEffect(.degrees(showingDetails ? 90 : 0))
+          .frame(width: 12)
 
-      Text(workspace.name)
-        .fontWeight(.medium)
-      if !workspace.file.branch.isEmpty {
-        Text(workspace.file.branch)
-          .font(.system(.caption, design: .monospaced))
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.head)
-      }
+        Text(workspace.name)
+          .fontWeight(.medium)
+        if !workspace.file.branch.isEmpty {
+          Text(workspace.file.branch)
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.head)
+        }
 
-      Spacer()
+        Spacer()
 
-      if let size = model.sizes[workspace.url] {
-        Text(size.formatted)
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.tertiary)
+        if let size = model.sizes[workspace.url] {
+          Text(size.formatted)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.tertiary)
+        }
       }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 10)
+      .frame(maxWidth: .infinity)
+      // Without this the row is only clickable where it has drawn something.
+      .contentShape(Rectangle())
+      .background(hoveringSummary ? Color.primary.opacity(0.06) : .clear)
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 8)
+    .buttonStyle(.plain)
+    .onHover { hoveringSummary = $0 }
+    .animation(.easeInOut(duration: 0.12), value: showingDetails)
+    .help(showingDetails ? "Hide the repo list" : "Show the repo list")
   }
 
   private var repoList: some View {
