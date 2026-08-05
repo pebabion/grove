@@ -328,6 +328,11 @@ final class AppModel {
     }
     isScanning = false
 
+    // A branch can add or drop a skill without Grove doing anything, and a rescan is
+    // where Grove makes itself match the disk.
+    let service = WorkspaceService(git: git, toolPaths: toolPaths)
+    for workspace in workspaces { service.linkSkills(in: workspace.url) }
+
     // Forced, because a rescan is something the user asked for. Cached answers keep
     // an open pull request looking open for fifteen minutes after it was merged, and
     // waiting out a cache is not what pressing Rescan means. Nothing refreshed pull

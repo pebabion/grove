@@ -204,3 +204,31 @@ and no way to get in first. Measured against the real library: assigning
 `changeScrollback` keeps everything, and neither a resize nor `setup(isReset:)` undoes
 it. It cannot recover lines already discarded, which is why it runs before the shell
 starts.
+
+## Skills a workspace's repos carry
+
+An agent started at the workspace root cannot see them. Claude Code loads project
+skills from the starting directory and its parents; a repo's `.claude/skills` is a
+level down. Skills below the starting directory do load, but only after Claude reads a
+file in that subdirectory, so until then they are missing from autocomplete and cannot
+be invoked by name.
+
+Grove symlinks each one into the workspace root, which Claude Code supports directly.
+Verified against real sessions rather than inferred: a probe skill invisible from the
+workspace root became available through a link, and **the name it answered to was the
+link's name**, not the `name:` in its own frontmatter. That is what makes collisions
+solvable.
+
+- **Both forms.** Commands were merged into skills, and repos in use have both, so
+  `.claude/commands/*.md` is linked as well. Also verified with a real session.
+- **Names stay put unless they clash.** One repo with a `deploy` skill keeps `/deploy`.
+  Two repos with `deploy` both get prefixed, and neither keeps the bare name — choosing
+  a winner would be arbitrary and would change with the order repos were added.
+- **Targets are relative.** Renaming a workspace moves the folder, and an absolute
+  target would point at where it used to be.
+- **Only Grove's own links are removed.** Recognised by shape — relative, and pointing
+  at `../../<repo>/<.claude/kind>/<entry>` — not by being unfamiliar. These directories
+  belong to Claude Code, and people keep their own skills in them.
+
+Rebuilt on create, on adding or removing a repo, and on rescan, since a branch can add
+or drop a skill without Grove doing anything.

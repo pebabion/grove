@@ -130,7 +130,27 @@ public struct WorkspaceService: Sendable {
     }
 
     await runSetupHooks(for: created, workspace: workspace, branch: branch, onUpdate: onUpdate)
+    linkSkills(in: workspace)
     return workspace
+  }
+
+  /// Rebuilds the workspace's own skills directory from the repos now in it.
+  ///
+  /// An agent started at the workspace root cannot otherwise reach the skills its
+  /// repos carry: Claude Code loads project skills from the starting directory
+  /// upwards, and a repo's `.claude/skills` is a level down. Reads what is on disk
+  /// rather than what Grove just did, so it is safe to call at any point and corrects
+  /// a workspace that was changed behind Grove's back.
+  ///
+  /// Never fatal. A workspace whose skills could not be linked still works; one that
+  /// refused to be created because of a symlink would not.
+  @discardableResult
+  public func linkSkills(in workspace: URL) -> [SkillLink] {
+    let linker = SkillLinker()
+    let worktrees = Self.worktreeDirectories(in: workspace).map {
+      (repo: $0.lastPathComponent, url: $0)
+    }
+    return (try? linker.link(linker.discover(worktrees: worktrees), in: workspace)) ?? []
   }
 
   /// Adds one more repo to an existing workspace.
@@ -161,6 +181,7 @@ public struct WorkspaceService: Sendable {
     }
 
     await runSetupHooks(for: [repo], workspace: workspace, branch: branch, onUpdate: onUpdate)
+    linkSkills(in: workspace)
   }
 
   /// Runs a repo's setup hook again, for when a lockfile moved or setup failed.
@@ -350,6 +371,9 @@ public struct WorkspaceService: Sendable {
       file.repos.removeAll { $0 == member.repoName }
       try? store.save(file, to: metadataURL)
     }
+
+    // The removed repo's skills went with its worktree, so its links are now dangling.
+    linkSkills(in: workspace.url)
 
     onUpdate(ProvisionUpdate(repo: member.repoName, state: .pending, detail: "Removed"))
   }
