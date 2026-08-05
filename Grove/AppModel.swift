@@ -111,7 +111,8 @@ final class AppModel {
       at: directory,
       label: directory.lastPathComponent,
       environment: toolPaths.processEnvironment(),
-      font: terminalFont
+      font: terminalFont,
+      foreground: terminalForeground
     )
     session?.focus()
     return session
@@ -120,6 +121,15 @@ final class AppModel {
   /// Restyles the shells already running, after a change in Settings.
   func applyTerminalFont() {
     terminals.applyFont(terminalFont)
+  }
+
+  func applyTerminalForeground() {
+    terminals.applyForeground(terminalForeground)
+  }
+
+  /// The colour embedded terminals draw default text in.
+  var terminalForeground: NSColor {
+    TerminalPalette.color(library.terminalForeground)
   }
 
   /// The font embedded terminals render with.

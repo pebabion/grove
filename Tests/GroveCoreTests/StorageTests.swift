@@ -145,3 +145,27 @@ struct LibraryDecodingTests {
     #expect(decoded == original)
   }
 }
+
+@Suite("terminal colour setting")
+struct TerminalColourTests {
+  @Test("a file written before the colour existed still loads")
+  func toleratesMissingColour() throws {
+    // The check that matters: every new persisted field must be decodeIfPresent, or
+    // it hides the whole library the way toolOverrides did.
+    let library = try JSONDecoder().decode(
+      RepoLibrary.self,
+      from: Data(#"{"repos":[],"workspaceRoot":"~/w","terminalFontSize":14}"#.utf8))
+
+    #expect(library.terminalForeground == nil)
+    #expect(library.terminalFontSize == 14)
+  }
+
+  @Test("the colour survives a round trip")
+  func roundTrips() throws {
+    let original = RepoLibrary(workspaceRoot: "~/w", terminalForeground: "#E8E8E8")
+
+    let data = try JSONEncoder().encode(original)
+
+    #expect(try JSONDecoder().decode(RepoLibrary.self, from: data).terminalForeground == "#E8E8E8")
+  }
+}

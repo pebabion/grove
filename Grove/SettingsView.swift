@@ -421,11 +421,42 @@ struct TerminalSettings: View {
         .foregroundStyle(.secondary)
       }
 
+      Section {
+        ColorPicker(
+          "Text",
+          selection: Binding(
+            get: { Color(nsColor: model.terminalForeground) },
+            set: {
+              model.library.terminalForeground = TerminalPalette.hex(NSColor($0))
+              model.saveLibrary()
+              model.applyTerminalForeground()
+            }),
+          supportsOpacity: false
+        )
+        Button("Use the default") {
+          model.library.terminalForeground = nil
+          model.saveLibrary()
+          model.applyTerminalForeground()
+        }
+        .controlSize(.small)
+        .disabled(model.library.terminalForeground == nil)
+      } header: {
+        Text("Colour")
+      } footer: {
+        Text(
+          "Applies to text a program leaves uncoloured. SwiftTerm's own default is a "
+            + "mid-grey, which reads as dim on a dark background."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
       // Worth showing rather than describing: the list has hundreds of families and
       // their names say nothing about whether the glyphs are there.
       Section("Preview") {
         Text(verbatim: "❯ git status  ~/code/grove  \u{ea71} main \u{f00c} ✔ 42%")
           .font(Font(model.terminalFont))
+          .foregroundStyle(Color(nsColor: model.terminalForeground))
           .lineLimit(1)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(8)

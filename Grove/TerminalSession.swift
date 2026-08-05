@@ -34,13 +34,14 @@ final class TerminalSession: Identifiable {
 
   init(
     worktree: URL, repoName: String, environment: [String: String], shell: String,
-    font: NSFont
+    font: NSFont, foreground: NSColor
   ) {
     self.id = worktree.path
     self.worktree = worktree
     self.repoName = repoName
     self.view = GroveTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
     self.view.font = font
+    self.view.nativeForegroundColor = foreground
 
     delegate.session = self
     view.processDelegate = delegate
@@ -139,7 +140,8 @@ final class TerminalSessions {
   /// replaced on the very next redraw.
   @discardableResult
   func start(
-    at directory: URL, label: String, environment: [String: String], font: NSFont
+    at directory: URL, label: String, environment: [String: String], font: NSFont,
+    foreground: NSColor
   ) -> TerminalSession? {
     guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
     if let existing = existing(at: directory) { return existing }
@@ -149,7 +151,8 @@ final class TerminalSessions {
       repoName: label,
       environment: environment,
       shell: loginShell,
-      font: font
+      font: font,
+      foreground: foreground
     )
     session.onExit = { [weak self] in
       self?.sessions.removeValue(forKey: directory.path)
@@ -175,6 +178,13 @@ final class TerminalSessions {
   func applyFont(_ font: NSFont) {
     for session in sessions.values {
       session.view.font = font
+    }
+  }
+
+  /// Recolours the shells already running.
+  func applyForeground(_ color: NSColor) {
+    for session in sessions.values {
+      session.view.nativeForegroundColor = color
     }
   }
 
