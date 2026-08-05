@@ -142,3 +142,36 @@ frontmost app unless the delegate returns presentation options. `add` succeeds a
 nothing is drawn. This is not an edge case for Grove: watching one workspace while a
 session in another finishes leaves Grove frontmost, which is the case the feature
 exists for.
+
+## Letting Claude Code report for itself
+
+A progress report says work stopped; it cannot say whether the agent finished or
+paused to ask something. Claude Code's hooks can, so Grove registers two of them:
+`Notification` for "wants a human" and `Stop` for "turn ended". Both were confirmed
+firing against a live session before any of this was built, and the payload carried
+`cwd` — which is how an event finds its session — plus Claude Code's own wording,
+which beats anything Grove would write.
+
+**Do not depend on a documented field being present.** The docs list a `type` on
+`Notification` events; the live capture had none. Parsing treats every field except
+`hook_event_name` and `cwd` as optional and drops what it cannot read.
+
+**Never write the payload into the watched directory.** The relay writes to a temp
+file and moves it in. Creating the file in place and then filling it is a race the
+watcher wins: it wakes on the empty file, reads nothing, deletes it, and the write
+lands on a deleted inode. Every event was silently lost that way.
+
+**`settings.json` belongs to the user and to other tools.** A real one held five hook
+events registered by something else. Grove appends, never replaces, keeps a copy
+before its first edit, and refuses to rewrite a file it cannot parse.
+
+Hook events and progress reports describe the same moment, so notifying from both
+would mean two notifications. Once a directory has delivered a hook event, its
+progress reports only drive the sidebar. Notifications are also keyed by session
+identifier, so a later signal replaces an earlier one instead of stacking.
+
+## Rescan means ask again
+
+`rescan()` forces a pull request refresh. It used to refresh nothing, so a merged
+pull request kept showing as open until the next launch, and even then a fifteen
+minute cache could hold the stale answer. An explicit action must not serve a cache.

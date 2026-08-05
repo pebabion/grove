@@ -14,6 +14,7 @@ import os
 ///     tail -f ~/Library/Logs/Grove.log
 enum Log {
   static let sessions = Category(name: "sessions")
+  static let hooks = Category(name: "hooks")
 
   struct Category {
     let name: String

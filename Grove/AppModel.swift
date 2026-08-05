@@ -48,6 +48,9 @@ final class AppModel {
   /// straight back.
   private var dismissedVersion: SemanticVersion?
   var isDownloadingUpdate = false
+
+  /// Why registering the Claude Code relay failed, for Settings to show.
+  var hookError: String?
   var updateStage: UpdateStage?
 
   /// Live shells, one per worktree. Held here so they survive navigating away.
@@ -101,26 +104,84 @@ final class AppModel {
     selectSession(session)
   }
 
+  /// Reports what Claude Code said, against the session it came from.
+  private func handle(_ event: HookEvent) {
+    guard let session = session(workingIn: event.directory) else {
+      // Claude Code run somewhere Grove does not manage. Not Grove's business.
+      Log.hooks.note("no session under \(event.directory.path)")
+      return
+    }
+
+    hookReporting.insert(session.directory)
+    let signal: SessionSignal = event.reason == .needsInput ? .needsInput : .finished
+    notify(signal, from: session, saying: event.message)
+  }
+
+  /// The session an agent is working in: the one started there, or failing that the
+  /// one whose worktree contains it, since an agent can change directory.
+  private func session(workingIn directory: URL) -> TerminalSession? {
+    let path = directory.canonical.path
+    let live = terminals.sessions
+    if let exact = live.first(where: { $0.directory.canonical.path == path }) { return exact }
+    return
+      live
+      .filter { path.hasPrefix($0.directory.canonical.path + "/") }
+      .max { $0.directory.path.count < $1.directory.path.count }
+  }
+
   /// Notifies unless the user is already looking at the session.
   ///
   /// A notification for the window in front of you is noise, and the sidebar dot
   /// covers the case where they are in Grove but looking elsewhere.
   private func handle(_ signal: SessionSignal, from session: TerminalSession) {
+    if hookReporting.contains(session.directory) {
+      // Claude Code is reporting this one properly; the progress report only repeats
+      // it, less precisely.
+      session.needsAttention = true
+      return
+    }
+    notify(signal, from: session, saying: nil)
+  }
+
+  private func notify(_ signal: SessionSignal, from session: TerminalSession, saying: String?) {
     guard library.notifySessionEvents ?? true else {
       Log.sessions.note("notifications are switched off")
       return
     }
+    session.needsAttention = true
     guard !isWatching(session) else {
       Log.sessions.note("already watching \(session.displayName)")
       return
     }
 
     Log.sessions.note("notifying for \(session.displayName)")
-    session.needsAttention = true
     let workspace = session.workspace.lastPathComponent
     let name = session.displayName
     let id = session.id
-    Task { await notifier.post(signal, session: name, workspace: workspace, id: id) }
+    Task {
+      await notifier.post(signal, session: name, workspace: workspace, id: id, saying: saying)
+    }
+  }
+
+  /// Turns the Claude Code relay on or off, and reports what went wrong if it did.
+  func setClaudeHooks(_ enabled: Bool) {
+    do {
+      if enabled {
+        try hookRelay.install()
+        hookRelay.start()
+      } else {
+        hookRelay.stop()
+        try hookRelay.uninstall()
+        hookReporting.removeAll()
+      }
+      library.claudeHooks = enabled
+      saveLibrary()
+    } catch {
+      Log.hooks.problem(
+        "could not \(enabled ? "install" : "remove") the relay: \(error.localizedDescription)")
+      hookError = error.localizedDescription
+      library.claudeHooks = hookRelay.isInstalled
+    }
   }
 
   /// Whether this session is the one on screen, in the front window.
@@ -184,6 +245,15 @@ final class AppModel {
   }
 
   private let notifier = SessionNotifier()
+  let hookRelay = HookRelay()
+
+  /// Directories that have delivered a hook event.
+  ///
+  /// Once Claude Code is reporting for a directory, its progress reports are left to
+  /// drive the sidebar only. Both signals describe the same moment, and the hook
+  /// describes it better, so notifying from both would mean two notifications for one
+  /// event.
+  private var hookReporting: Set<URL> = []
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
   private var saveTask: Task<Void, Never>?
@@ -210,9 +280,13 @@ final class AppModel {
       self?.handle(signal, from: session)
     }
     notifier.onOpen = { [weak self] id in self?.reveal(sessionID: id) }
+    hookRelay.onEvent = { [weak self] event in self?.handle(event) }
 
     toolPaths = await ToolPaths.discover()
     loadLibrary()
+    // After loadLibrary, not before: the setting being read lives in the library, and
+    // reading it first gets the default rather than the answer.
+    if library.claudeHooks == true, hookRelay.isInstalled { hookRelay.start() }
     // Turn an older "Zed" style name into the app it meant, so nobody has to
     // pick their editor a second time.
     let before = library
@@ -250,6 +324,12 @@ final class AppModel {
       selection = workspaces.first?.url
     }
     isScanning = false
+
+    // Forced, because a rescan is something the user asked for. Cached answers keep
+    // an open pull request looking open for fifteen minutes after it was merged, and
+    // waiting out a cache is not what pressing Rescan means. Nothing refreshed pull
+    // requests here at all before, so a merged one stayed open until the next launch.
+    await refreshPullRequests(force: true)
   }
 
   /// Reads the library, keeping a failure to read distinct from an empty library.

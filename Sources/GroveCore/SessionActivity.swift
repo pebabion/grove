@@ -3,9 +3,14 @@ import Foundation
 /// Something a session did that is worth telling the user about.
 public enum SessionSignal: Sendable, Hashable {
   /// The program stopped working and is waiting — finished, or asking a question.
+  /// This is all a progress report can tell us.
   case waiting
   /// The program rang the terminal bell, which only ever means "look at me".
   case rangBell
+  /// Claude Code said it wants an answer. Only a hook can distinguish this.
+  case needsInput
+  /// Claude Code said the turn is over.
+  case finished
 }
 
 /// Watches one session's progress reports and decides when it wants attention.

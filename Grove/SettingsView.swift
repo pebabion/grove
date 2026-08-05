@@ -431,6 +431,18 @@ struct TerminalSettings: View {
               model.saveLibrary()
             })
         )
+        Toggle(
+          "Let Claude Code report directly",
+          isOn: Binding(
+            get: { model.library.claudeHooks ?? false },
+            set: { model.setClaudeHooks($0) })
+        )
+        .disabled(!(model.library.notifySessionEvents ?? true))
+        if let problem = model.hookError {
+          Text(problem)
+            .font(.caption)
+            .foregroundStyle(.red)
+        }
       } header: {
         Text("Notifications")
       } footer: {
@@ -438,7 +450,11 @@ struct TerminalSettings: View {
           "Agents report when they start and stop working, so Grove can notify you "
             + "once a session finishes or stops to ask something — unless you are "
             + "already looking at it. Sessions waiting for you keep a dot in the "
-            + "sidebar either way."
+            + "sidebar either way.\n\n"
+            + "Reporting directly tells the two apart, since Claude Code says which "
+            + "it is in its own words. It registers a script in Claude Code's "
+            + "settings, keeping the hooks already there and copying the file first. "
+            + "Turning it off takes the script back out."
         )
         .font(.caption)
         .foregroundStyle(.secondary)

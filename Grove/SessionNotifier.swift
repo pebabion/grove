@@ -31,7 +31,9 @@ final class SessionNotifier {
     center.delegate = handler
   }
 
-  func post(_ signal: SessionSignal, session: String, workspace: String, id: UUID) async {
+  func post(
+    _ signal: SessionSignal, session: String, workspace: String, id: UUID, saying: String? = nil
+  ) async {
     guard Self.isAvailable else {
       Log.sessions.problem("no bundle identifier, so notifications are unavailable")
       return
@@ -44,18 +46,25 @@ final class SessionNotifier {
     let content = UNMutableNotificationContent()
     content.title = session
     content.subtitle = workspace
-    content.body =
+    // Claude Code's own wording when it gave any: "Claude is waiting for your
+    // input" says more than anything Grove would write in its place.
+    let groveWords: String =
       switch signal {
       case .waiting: "Waiting for you"
-      case .rangBell: "Needs your input"
+      case .rangBell, .needsInput: "Needs your input"
+      case .finished: "Finished"
       }
+    content.body = saying ?? groveWords
     content.sound = .default
     content.userInfo = [sessionKey: id.uuidString]
     // Grouped by session, so ten turns in one session do not stack up ten cards.
     content.threadIdentifier = id.uuidString
 
+    // Keyed by session, so a later signal replaces the earlier one rather than
+    // stacking beside it. That is also what keeps the terminal's vaguer "waiting"
+    // from sitting under Claude Code's more precise reason for the same moment.
     let request = UNNotificationRequest(
-      identifier: UUID().uuidString, content: content, trigger: nil)
+      identifier: id.uuidString, content: content, trigger: nil)
     do {
       try await center.add(request)
       Log.sessions.note("posted for \(session)")
