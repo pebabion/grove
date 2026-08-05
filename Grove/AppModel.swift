@@ -129,12 +129,12 @@ final class AppModel {
       return
     }
 
-    let base = (try? await git.defaultBranch(repo: url)) ?? "origin/main"
+    let base = (try? await git.defaultBranch(repo: url)) ?? nil ?? "origin/main"
     library.repos.append(
       RepoEntry(
         name: name,
         path: shortenHome(url.path),
-        base: base ?? "origin/main",
+        base: base,
         colorIndex: library.nextColorIndex()
       ))
     library.repos.sort { $0.name < $1.name }

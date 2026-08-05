@@ -106,31 +106,33 @@ final class TerminalSessions {
   /// The shell to run. See ``UserShell`` for why the environment is not trusted.
   private var loginShell: String { UserShell.path }
 
-  func session(for member: WorkspaceMember, environment: [String: String]) -> TerminalSession? {
-    guard FileManager.default.fileExists(atPath: member.url.path) else { return nil }
-    if let existing = sessions[member.url.path], !existing.hasExited { return existing }
+  /// A shell in `directory`, started if there is not one already.
+  ///
+  /// Keyed by directory rather than by repo, so the workspace root gets one too —
+  /// which is where you want to be for anything spanning the repos.
+  func session(at directory: URL, label: String, environment: [String: String])
+    -> TerminalSession?
+  {
+    guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
+    if let existing = sessions[directory.path], !existing.hasExited { return existing }
 
     let session = TerminalSession(
-      worktree: member.url,
-      repoName: member.repoName,
+      worktree: directory,
+      repoName: label,
       environment: environment,
       shell: loginShell
     )
-    sessions[member.url.path] = session
+    sessions[directory.path] = session
     return session
   }
 
-  func existing(for member: WorkspaceMember) -> TerminalSession? {
-    sessions[member.url.path]
-  }
-
-  func isRunning(_ member: WorkspaceMember) -> Bool {
-    guard let session = sessions[member.url.path] else { return false }
+  func isRunning(at directory: URL) -> Bool {
+    guard let session = sessions[directory.path] else { return false }
     return !session.hasExited
   }
 
-  func close(_ member: WorkspaceMember) {
-    sessions.removeValue(forKey: member.url.path)?.terminate()
+  func close(at directory: URL) {
+    sessions.removeValue(forKey: directory.path)?.terminate()
   }
 
   /// Ends every session inside a directory that is about to disappear.

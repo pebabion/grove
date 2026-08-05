@@ -7,28 +7,42 @@ struct WorkspaceDetail: View {
 
   @State private var expandedLogs: Set<String> = []
   @State private var showingTerminal = false
+  @State private var showingDetails = true
 
   var body: some View {
-    // Split rather than stacked, so the terminal can be given as much of the
-    // window as the work needs.
-    VSplitView {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-          header
-          repoList
-          addRepoSection
+    VStack(spacing: 0) {
+      // Always present, one line: which workspace this is and how to get the rest
+      // back. The repo list below it is reference material — worth reading once,
+      // then in the way of the terminal.
+      summaryBar
+      Divider()
+
+      if showingDetails {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 20) {
+            repoList
+            addRepoSection
+          }
+          .padding(24)
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Capped when sharing with a terminal, so the terminal gets the room.
+        .frame(maxHeight: showingTerminal ? 280 : .infinity)
+        if showingTerminal { Divider() }
       }
-      .frame(minHeight: 140)
 
       if showingTerminal {
         TerminalPane(workspace: workspace)
-          .frame(minHeight: 180, idealHeight: 320)
+          .frame(maxHeight: .infinity)
+      } else if !showingDetails {
+        Spacer()
       }
     }
     .navigationTitle(workspace.name)
+    .onChange(of: showingTerminal) { _, opened in
+      // Opening a terminal is a statement about what you want the window for.
+      if opened { showingDetails = false }
+    }
     .toolbar {
       ToolbarItemGroup {
         Button {
@@ -44,7 +58,8 @@ struct WorkspaceDetail: View {
         } label: {
           Label("Terminal", systemImage: "apple.terminal")
         }
-        .help(showingTerminal ? "Hide the terminal" : "Open a terminal in each repo")
+        .keyboardShortcut("t", modifiers: .command)
+        .help(showingTerminal ? "Hide the terminal" : "Open a terminal in this workspace")
 
         Menu {
           WorkspaceActions(workspace: workspace)
@@ -56,38 +71,39 @@ struct WorkspaceDetail: View {
     }
   }
 
-  private var header: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(workspace.name)
-          .font(.title2.weight(.semibold))
-        if !workspace.file.branch.isEmpty {
-          Text(workspace.file.branch)
-            .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
-        }
-      }
-      HStack(spacing: 6) {
-        Text(workspace.url.path)
-          .font(.system(.caption, design: .monospaced))
-          .foregroundStyle(.tertiary)
-          .textSelection(.enabled)
-
-        if let size = model.sizes[workspace.url] {
-          Text("· \(size.formatted) on disk")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            .help("Measured \(size.measuredAt.formatted(.relative(presentation: .named)))")
-        } else if !model.isMeasuring {
-          Button("measure size") {
-            Task { await model.measure([workspace]) }
-          }
-          .buttonStyle(.link)
+  /// Name, branch and size on one line, with a disclosure for the rest.
+  private var summaryBar: some View {
+    HStack(spacing: 8) {
+      Button {
+        showingDetails.toggle()
+      } label: {
+        Image(systemName: showingDetails ? "chevron.down" : "chevron.right")
           .font(.caption)
-        }
+          .foregroundStyle(.secondary)
+      }
+      .buttonStyle(.plain)
+      .help(showingDetails ? "Hide the repo list" : "Show the repo list")
+
+      Text(workspace.name)
+        .fontWeight(.medium)
+      if !workspace.file.branch.isEmpty {
+        Text(workspace.file.branch)
+          .font(.system(.caption, design: .monospaced))
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.head)
+      }
+
+      Spacer()
+
+      if let size = model.sizes[workspace.url] {
+        Text(size.formatted)
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.tertiary)
       }
     }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 8)
   }
 
   private var repoList: some View {

@@ -15,12 +15,35 @@ struct TerminalViewBridge: NSViewRepresentable {
   func updateNSView(_ view: LocalProcessTerminalView, context: Context) {}
 }
 
-/// A terminal per repo in the workspace, with a tab strip to pick between them.
+/// A terminal for the workspace and one per repo, with a tab strip to choose.
 struct TerminalPane: View {
   @Environment(AppModel.self) private var model
   let workspace: Workspace
 
   @State private var selected: String?
+
+  /// Somewhere a shell can run: the workspace itself, or one of its worktrees.
+  private struct Target: Identifiable {
+    let label: String
+    let url: URL
+    /// Repos carry their colour; the workspace root gets a folder icon instead.
+    let repoName: String?
+    var id: String { url.path }
+  }
+
+  private var targets: [Target] {
+    // The workspace root first, since it is the sensible default for anything
+    // touching more than one repo.
+    var all = [Target(label: "workspace", url: workspace.url, repoName: nil)]
+    all += workspace.members
+      .filter { FileManager.default.fileExists(atPath: $0.url.path) }
+      .map { Target(label: $0.repoName, url: $0.url, repoName: $0.repoName) }
+    return all
+  }
+
+  private var current: Target? {
+    targets.first { $0.id == selected } ?? targets.first
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -31,27 +54,24 @@ struct TerminalPane: View {
     .background(Color(nsColor: .textBackgroundColor))
   }
 
-  private var members: [WorkspaceMember] {
-    workspace.members.filter { FileManager.default.fileExists(atPath: $0.url.path) }
-  }
-
-  private var current: WorkspaceMember? {
-    members.first { $0.repoName == selected } ?? members.first
-  }
-
   private var tabStrip: some View {
     HStack(spacing: 4) {
-      ForEach(members) { member in
+      ForEach(targets) { target in
         Button {
-          selected = member.repoName
+          selected = target.id
         } label: {
           HStack(spacing: 5) {
-            RepoSwatch(repo: member.repoName, size: 7)
-            Text(member.repoName)
+            if let repo = target.repoName {
+              RepoSwatch(repo: repo, size: 7)
+            } else {
+              Image(systemName: "folder")
+                .font(.caption2)
+            }
+            Text(target.label)
               .font(.caption)
             // A filled dot means a shell is alive in there, which matters when
-            // deciding whether closing the pane will interrupt something.
-            if model.terminals.isRunning(member) {
+            // deciding whether closing it will interrupt something.
+            if model.terminals.isRunning(at: target.url) {
               Circle()
                 .fill(.green)
                 .frame(width: 5, height: 5)
@@ -60,7 +80,7 @@ struct TerminalPane: View {
           .padding(.horizontal, 8)
           .padding(.vertical, 4)
           .background(
-            member.repoName == current?.repoName ? Color.accentColor.opacity(0.25) : .clear,
+            target.id == current?.id ? Color.accentColor.opacity(0.25) : .clear,
             in: Capsule()
           )
         }
@@ -69,14 +89,14 @@ struct TerminalPane: View {
 
       Spacer()
 
-      if let member = current, model.terminals.isRunning(member) {
+      if let target = current, model.terminals.isRunning(at: target.url) {
         Button {
-          model.terminals.close(member)
+          model.terminals.close(at: target.url)
         } label: {
           Image(systemName: "xmark.circle")
         }
         .buttonStyle(.borderless)
-        .help("End the shell in \(member.repoName)")
+        .help("End the shell in \(target.label)")
       }
     }
     .padding(.horizontal, 8)
@@ -85,11 +105,12 @@ struct TerminalPane: View {
 
   @ViewBuilder
   private var terminal: some View {
-    if let member = current,
+    if let target = current,
       let session = model.terminals.session(
-        for: member, environment: model.toolPaths.processEnvironment())
+        at: target.url, label: target.label,
+        environment: model.toolPaths.processEnvironment())
     {
-      // Identified by worktree so switching tabs swaps views rather than reusing
+      // Identified by directory so switching tabs swaps views rather than reusing
       // one and rewiring it.
       TerminalViewBridge(session: session)
         .id(session.id)
@@ -103,7 +124,7 @@ struct TerminalPane: View {
           }
         }
     } else {
-      Text("No worktree to open a shell in yet.")
+      Text("No directory to open a shell in yet.")
         .font(.caption)
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
