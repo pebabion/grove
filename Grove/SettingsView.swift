@@ -231,6 +231,44 @@ struct GeneralSettings: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+
+      Section {
+        Picker(
+          "Font",
+          selection: Binding(
+            get: { TerminalFont.resolve(model.library.terminalFont) },
+            set: {
+              model.library.terminalFont = $0
+              model.saveLibrary()
+            })
+        ) {
+          ForEach(TerminalFont.monospacedFamilies, id: \.self) { family in
+            Text(family).tag(family)
+          }
+        }
+
+        Stepper(
+          "Size: \(Int(model.library.terminalFontSize ?? TerminalFont.defaultSize))",
+          value: Binding(
+            get: { model.library.terminalFontSize ?? TerminalFont.defaultSize },
+            set: {
+              model.library.terminalFontSize = $0
+              model.saveLibrary()
+            }),
+          in: 9...24,
+          step: 1
+        )
+      } header: {
+        Text("Terminal")
+      } footer: {
+        Text(
+          "A prompt built from Nerd Font glyphs needs a font that has them, or macOS "
+            + "substitutes them one at a time and the sizes stop matching. Applies to "
+            + "terminals opened from now on."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
     }
     .formStyle(.grouped)
     .fileImporter(isPresented: $showingPicker, allowedContentTypes: [.folder]) { result in

@@ -60,7 +60,7 @@ struct TerminalPane: View {
       guard let target = current else { return }
       model.terminals.start(
         at: target.url, label: target.label,
-        environment: model.toolPaths.processEnvironment())
+        environment: model.toolPaths.processEnvironment(), font: model.terminalFont)
     }
     .onChange(of: liveSessions) { _, live in
       // `exit` in the last tab means the pane has nothing left to show.
@@ -139,7 +139,7 @@ struct TerminalPane: View {
         guard let target = current else { return }
         model.terminals.start(
           at: target.url, label: target.label,
-          environment: model.toolPaths.processEnvironment())
+          environment: model.toolPaths.processEnvironment(), font: model.terminalFont)
       }
       .buttonStyle(.link)
       .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -75,13 +75,23 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// Prepended to generated branch names, e.g. `kelvin` gives `kelvin/thing`.
   public var branchPrefix: String?
 
+  /// Font family for the embedded terminal. Empty picks the best installed default.
+  ///
+  /// Worth choosing rather than assuming: a prompt built from Nerd Font glyphs
+  /// rendered in a font without them makes macOS substitute glyph by glyph, and
+  /// substitutes have different metrics — which reads as inconsistent sizing.
+  public var terminalFont: String?
+  public var terminalFontSize: Double?
+
   public init(
     repos: [RepoEntry] = [],
     workspaceRoot: String = "~/worktrees",
     editor: String? = nil,
     editorPath: String? = nil,
     terminalPath: String? = nil,
-    branchPrefix: String? = nil
+    branchPrefix: String? = nil,
+    terminalFont: String? = nil,
+    terminalFontSize: Double? = nil
   ) {
     self.repos = repos
     self.workspaceRoot = workspaceRoot
@@ -89,6 +99,8 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.editorPath = editorPath
     self.terminalPath = terminalPath
     self.branchPrefix = branchPrefix
+    self.terminalFont = terminalFont
+    self.terminalFontSize = terminalFontSize
   }
 
   /// Resolves the older `editor` name to a bundle path, once.

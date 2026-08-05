@@ -32,11 +32,15 @@ final class TerminalSession: Identifiable {
 
   private let delegate = Delegate()
 
-  init(worktree: URL, repoName: String, environment: [String: String], shell: String) {
+  init(
+    worktree: URL, repoName: String, environment: [String: String], shell: String,
+    font: NSFont
+  ) {
     self.id = worktree.path
     self.worktree = worktree
     self.repoName = repoName
     self.view = LocalProcessTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
+    self.view.font = font
 
     delegate.session = self
     view.processDelegate = delegate
@@ -116,9 +120,9 @@ final class TerminalSessions {
   /// Creating sessions from a view body meant a shell that had just exited was
   /// replaced on the very next redraw.
   @discardableResult
-  func start(at directory: URL, label: String, environment: [String: String])
-    -> TerminalSession?
-  {
+  func start(
+    at directory: URL, label: String, environment: [String: String], font: NSFont
+  ) -> TerminalSession? {
     guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
     if let existing = existing(at: directory) { return existing }
 
@@ -126,7 +130,8 @@ final class TerminalSessions {
       worktree: directory,
       repoName: label,
       environment: environment,
-      shell: loginShell
+      shell: loginShell,
+      font: font
     )
     session.onExit = { [weak self] in
       self?.sessions.removeValue(forKey: directory.path)

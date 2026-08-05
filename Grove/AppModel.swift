@@ -47,6 +47,11 @@ final class AppModel {
   /// Live shells, one per worktree. Held here so they survive navigating away.
   let terminals = TerminalSessions()
 
+  /// The font embedded terminals render with.
+  var terminalFont: NSFont {
+    TerminalFont.font(library.terminalFont, size: library.terminalFontSize)
+  }
+
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
 
