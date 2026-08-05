@@ -16,6 +16,17 @@ swift format --in-place --recursive Sources Tests Grove
 `Grove.xcodeproj` is generated and gitignored. Edit `project.yml`, never the
 project file.
 
+**Build with `make app`, not `xcodebuild` directly.** The make target regenerates
+the project first. Calling xcodebuild alone leaves the project stale, so a new file
+is silently left out of the build and a version bump in `project.yml` never reaches
+the bundle — which is how an installed build once reported a version two releases
+old.
+
+Do not try to prove what a build contains with `strings` or `nm`. The app is one
+Swift module with everything internal, so both report almost nothing: `nm` finds 123
+symbols and no UI string is visible. Compare the object file's timestamp against the
+source instead — `build/Build/Intermediates.noindex/.../Objects-normal/arm64/`.
+
 ## Structure
 
 All logic belongs in `GroveCore`, which builds and tests without Xcode. The
