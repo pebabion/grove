@@ -87,7 +87,41 @@ final class AppModel {
 
   func selectSession(_ session: TerminalSession) {
     activeSessions[session.workspace] = session.id
+    session.needsAttention = false
     session.focus()
+  }
+
+  /// Brings a session on screen from wherever the user is: selects its workspace,
+  /// opens the terminal pane and focuses it. Used by a clicked notification, where
+  /// the whole point is to land on the session rather than near it.
+  func reveal(sessionID: UUID) {
+    guard let session = terminals.session(id: sessionID) else { return }
+    selection = session.workspace
+    terminalWorkspaces.insert(session.workspace)
+    selectSession(session)
+  }
+
+  /// Notifies unless the user is already looking at the session.
+  ///
+  /// A notification for the window in front of you is noise, and the sidebar dot
+  /// covers the case where they are in Grove but looking elsewhere.
+  private func handle(_ signal: SessionSignal, from session: TerminalSession) {
+    guard library.notifySessionEvents ?? true else { return }
+    guard !isWatching(session) else { return }
+
+    session.needsAttention = true
+    let workspace = session.workspace.lastPathComponent
+    let name = session.displayName
+    let id = session.id
+    Task { await notifier.post(signal, session: name, workspace: workspace, id: id) }
+  }
+
+  /// Whether this session is the one on screen, in the front window.
+  private func isWatching(_ session: TerminalSession) -> Bool {
+    NSApp.isActive
+      && selection == session.workspace
+      && terminalWorkspaces.contains(session.workspace)
+      && activeSessions[session.workspace] == session.id
   }
 
   /// Starts a session in `directory` and brings it to the front.
@@ -142,6 +176,7 @@ final class AppModel {
     TerminalFont.font(library.terminalFont, size: library.terminalFontSize)
   }
 
+  private let notifier = SessionNotifier()
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
   private var saveTask: Task<Void, Never>?
@@ -164,6 +199,11 @@ final class AppModel {
   // MARK: - Lifecycle
 
   func load() async {
+    terminals.onSignal = { [weak self] session, signal in
+      self?.handle(signal, from: session)
+    }
+    notifier.onOpen = { [weak self] id in self?.reveal(sessionID: id) }
+
     toolPaths = await ToolPaths.discover()
     loadLibrary()
     // Turn an older "Zed" style name into the app it meant, so nobody has to

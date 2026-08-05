@@ -302,6 +302,19 @@ struct WorkspaceRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
               Spacer(minLength: 0)
+              // A dot that outlasts the notification: notifications get missed, and
+              // "which of these is waiting for me" is the question the sidebar
+              // should answer on its own.
+              if session.needsAttention {
+                Circle()
+                  .fill(Color.orange)
+                  .frame(width: 6, height: 6)
+              } else if session.isWorking {
+                ProgressView()
+                  .controlSize(.mini)
+                  .scaleEffect(0.6)
+                  .frame(width: 8, height: 8)
+              }
             }
             .padding(.vertical, 1)
             .contentShape(Rectangle())

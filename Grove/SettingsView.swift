@@ -422,6 +422,29 @@ struct TerminalSettings: View {
       }
 
       Section {
+        Toggle(
+          "Tell me when a session is waiting",
+          isOn: Binding(
+            get: { model.library.notifySessionEvents ?? true },
+            set: {
+              model.library.notifySessionEvents = $0
+              model.saveLibrary()
+            })
+        )
+      } header: {
+        Text("Notifications")
+      } footer: {
+        Text(
+          "Agents report when they start and stop working, so Grove can notify you "
+            + "once a session finishes or stops to ask something — unless you are "
+            + "already looking at it. Sessions waiting for you keep a dot in the "
+            + "sidebar either way."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
+      Section {
         ColorPicker(
           "Text",
           selection: Binding(

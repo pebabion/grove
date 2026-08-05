@@ -29,6 +29,20 @@ final class TerminalSession: Identifiable {
   var title: String = ""
   var hasExited = false
 
+  /// True from the moment the session asked for attention until the user looks at
+  /// it. Drawn as a dot beside the session in the sidebar, so the signal survives a
+  /// notification the user never saw.
+  var needsAttention = false
+
+  /// Whether the program is doing something right now, as it reports itself.
+  var isWorking = false
+
+  /// Called when the session wants the user, whoever is looking at what.
+  /// Deciding whether that deserves a notification is the app model's job.
+  var onSignal: (@MainActor (SessionSignal) -> Void)?
+
+  private var monitor = SessionActivityMonitor()
+
   /// Called once when the shell exits, so the owner can forget the session.
   var onExit: (@MainActor () -> Void)?
 
@@ -82,6 +96,23 @@ final class TerminalSession: Identifiable {
       execName: nil,
       currentDirectory: directory.path
     )
+
+    // After startProcess: the terminal these hang off does not exist before it.
+    view.watchProgress()
+    view.onOscNine = { [weak self] payload in self?.report(oscNine: payload) }
+    view.onBell = { [weak self] in self?.signal(.rangBell) }
+  }
+
+  /// Reads a progress report and signals if the session has stopped working.
+  private func report(oscNine payload: String) {
+    guard let reported = SessionProgress.parse(oscNine: payload) else { return }
+    let signal = monitor.received(reported, at: Date())
+    isWorking = monitor.isWorking
+    if let signal { self.signal(signal) }
+  }
+
+  private func signal(_ signal: SessionSignal) {
+    onSignal?(signal)
   }
 
   /// Puts the keyboard into this terminal.
@@ -147,6 +178,9 @@ final class TerminalSession: Identifiable {
 final class TerminalSessions {
   private(set) var sessions: [TerminalSession] = []
 
+  /// Called when any session wants attention. Set once, by the app model.
+  var onSignal: (@MainActor (TerminalSession, SessionSignal) -> Void)?
+
   /// The shell to run. See ``UserShell`` for why the environment is not trusted.
   private var loginShell: String { UserShell.path }
 
@@ -178,6 +212,12 @@ final class TerminalSessions {
     )
     session.onExit = { [weak self, id = session.id] in
       self?.sessions.removeAll { $0.id == id }
+    }
+    // Weak on both sides: the session holds this closure, so capturing it strongly
+    // would be a cycle and no session would ever be freed.
+    session.onSignal = { [weak self, weak session] signal in
+      guard let self, let session else { return }
+      onSignal?(session, signal)
     }
     sessions.append(session)
     return session

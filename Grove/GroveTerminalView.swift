@@ -23,6 +23,47 @@ final class GroveTerminalView: LocalProcessTerminalView {
 
   private var keyMonitor: Any?
 
+  /// Called when the running program rings the bell, which is the one signal that
+  /// means nothing except "look at me".
+  var onBell: (@MainActor () -> Void)?
+
+  /// Called with the payload of an OSC 9 sequence — how a program reports whether
+  /// it is working. See ``SessionProgress``.
+  var onOscNine: (@MainActor (String) -> Void)?
+
+  /// `bell` is open, unlike `progressReport` and `keyDown`, so this one signal can
+  /// be taken the direct way.
+  override func bell(source: Terminal) {
+    super.bell(source: source)
+    onBell?()
+  }
+
+  /// Starts listening for progress reports.
+  ///
+  /// Called after the process starts, because `terminal` does not exist until then.
+  /// Registering a handler for OSC 9 replaces SwiftTerm's own, so the parsed report
+  /// is handed back to it afterwards and its progress bar keeps working.
+  func watchProgress() {
+    guard let terminal else { return }
+    terminal.registerOscHandler(code: 9) { [weak self] payload in
+      let text = String(decoding: payload, as: UTF8.self)
+      Task { @MainActor in
+        self?.onOscNine?(text)
+        self?.forwardToSwiftTerm(text)
+      }
+    }
+  }
+
+  private func forwardToSwiftTerm(_ payload: String) {
+    guard let terminal else { return }
+    let fields = payload.split(separator: ";", omittingEmptySubsequences: false)
+    guard fields.first == "4", fields.count >= 2, let raw = Int(fields[1]),
+      let state = Terminal.ProgressReportState(rawValue: raw)
+    else { return }
+    let percent = fields.count >= 3 ? UInt8(fields[2]) : nil
+    progressReport(source: terminal, report: .init(state: state, progress: percent))
+  }
+
   /// SwiftTerm's initialisers are public but not open, so the monitor is installed
   /// when the view joins a window instead — which is the right lifecycle for it
   /// regardless, since it only matters while the view is on screen. Leaving the

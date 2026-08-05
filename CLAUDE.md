@@ -96,3 +96,31 @@ The teardown badge therefore shows only what the pull request says — merged, o
 closed unmerged — and nothing at all otherwise. The ordinary case needs no label;
 the card already reports "nothing unsaved, safe to remove" when there is nothing
 to lose.
+
+## Knowing when an agent wants you
+
+Grove notifies from the terminal's own byte stream, not from anything Claude Code
+specific. Two signals, both measured against a real session rather than assumed:
+
+- **`OSC 9;4;<state>`** — a progress report. Claude Code sends `3` when it starts
+  working and `0` when it stops. This is the reliable one, and it needs no setup.
+- **The bell** — supported because other tools ring it. Claude Code did not ring one
+  in either capture, so nothing depends on it.
+
+**Do not build the "needs input" case on the bell.** A raw count of `0x07` bytes in a
+capture is misleading: every OSC sequence ends with BEL, so a session that rang
+nothing still shows ten of them. Strip `ESC ] … BEL` before counting.
+
+Finishing and stopping to ask a question arrive identically, because an agent
+awaiting permission has stopped working. Grove does not distinguish them — both mean
+the session is waiting for you, which is the whole content of the notification.
+
+`SwiftTerm`'s `progressReport(source:report:)` is `public` but not `open`, so it
+cannot be overridden. `registerOscHandler(code: 9)` replaces SwiftTerm's own parsing,
+so `GroveTerminalView` hands the parsed report back to it afterwards and the built-in
+progress bar keeps working.
+
+**Notifications need the app launched as a bundle.** Ad-hoc signing is fine —
+`requestAuthorization` is granted for an ad-hoc signed app opened through Finder. Run
+the executable inside the bundle directly and the same call fails with "Notifications
+are not allowed for this application", which looks like a signing problem and is not.

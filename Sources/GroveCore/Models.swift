@@ -105,6 +105,9 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// than most terminals and hard to read against a dark background.
   public var terminalForeground: String?
 
+  /// Whether to post a notification when a session finishes or asks for input.
+  public var notifySessionEvents: Bool?
+
   /// Explicit paths for tools the login shell does not reveal, keyed by tool name.
   ///
   /// ``ToolPaths`` has always honoured overrides, but nothing set them and nothing
@@ -121,6 +124,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalFont: String? = nil,
     terminalFontSize: Double? = nil,
     terminalForeground: String? = nil,
+    notifySessionEvents: Bool? = nil,
     toolOverrides: [String: String] = [:]
   ) {
     self.repos = repos
@@ -132,6 +136,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.terminalFont = terminalFont
     self.terminalFontSize = terminalFontSize
     self.terminalForeground = terminalForeground
+    self.notifySessionEvents = notifySessionEvents
     self.toolOverrides = toolOverrides
   }
 
@@ -144,7 +149,8 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   // decoded the same way.
   enum CodingKeys: String, CodingKey {
     case repos, workspaceRoot, editor, editorPath, terminalPath, branchPrefix
-    case terminalFont, terminalFontSize, terminalForeground, toolOverrides
+    case terminalFont, terminalFontSize, terminalForeground
+    case notifySessionEvents, toolOverrides
   }
 
   public init(from decoder: Decoder) throws {
@@ -159,6 +165,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalFont = try container.decodeIfPresent(String.self, forKey: .terminalFont)
     terminalFontSize = try container.decodeIfPresent(Double.self, forKey: .terminalFontSize)
     terminalForeground = try container.decodeIfPresent(String.self, forKey: .terminalForeground)
+    notifySessionEvents = try container.decodeIfPresent(Bool.self, forKey: .notifySessionEvents)
     toolOverrides =
       try container.decodeIfPresent([String: String].self, forKey: .toolOverrides) ?? [:]
   }

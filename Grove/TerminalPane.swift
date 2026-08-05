@@ -56,6 +56,11 @@ struct TerminalPane: View {
             Text(session.displayName)
               .font(.caption)
               .lineLimit(1)
+            if session.needsAttention {
+              Circle()
+                .fill(Color.orange)
+                .frame(width: 5, height: 5)
+            }
           }
           .padding(.horizontal, 8)
           .padding(.vertical, 4)
