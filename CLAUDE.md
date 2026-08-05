@@ -190,3 +190,17 @@ Nothing is lost by default. Claude Code sets no mouse tracking mode at all — m
 through a PTY, it sets only focus reporting, bracketed paste and synchronised output —
 and neither does a shell. The setting exists for programs that do read the mouse, such
 as vim or lazygit.
+
+## Scrollback
+
+Sessions ask for 10,000 lines. SwiftTerm's default is 500, which a long agent
+conversation passes in minutes, and the top of the transcript was simply gone.
+
+**It has to be set through `Terminal.changeScrollback` before the process starts.**
+The buffer's capacity is fixed when the terminal is created, and the view creates its
+own terminal with `TerminalOptions(cols:rows:)` — there is no init that takes options
+and no way to get in first. Measured against the real library: assigning
+`options.scrollback` afterwards changes nothing and still keeps 525 lines,
+`changeScrollback` keeps everything, and neither a resize nor `setup(isReset:)` undoes
+it. It cannot recover lines already discarded, which is why it runs before the shell
+starts.

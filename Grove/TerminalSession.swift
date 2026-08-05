@@ -21,6 +21,12 @@ final class TerminalSession: Identifiable {
   /// Shown until the program running says otherwise.
   let fallbackName: String
 
+  /// How much history a session keeps.
+  ///
+  /// Twenty times SwiftTerm's default. Lines are only materialised as they are used,
+  /// so the cost follows what a session actually prints rather than the cap.
+  private static let scrollbackLines = 10_000
+
   /// Whatever the running program set the terminal title to.
   ///
   /// This is how a session gets its name: `claude --name session_1` sets the title
@@ -82,6 +88,12 @@ final class TerminalSession: Identifiable {
     // while this is on, whether or not a program ever asked for the mouse, so leaving
     // it on means text cannot be selected at all.
     self.view.allowMouseReporting = mouseReporting
+
+    // SwiftTerm keeps 500 lines, which a long agent conversation passes in minutes,
+    // and the top of it was being thrown away. Set before the process starts: the
+    // buffer's capacity is fixed when the terminal is created, so this is the only way
+    // in from outside the library, and it cannot bring back lines already discarded.
+    self.view.terminal?.changeScrollback(Self.scrollbackLines)
 
     delegate.session = self
     view.processDelegate = delegate
