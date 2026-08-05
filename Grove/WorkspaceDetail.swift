@@ -79,8 +79,9 @@ struct WorkspaceDetail: View {
         } label: {
           Label("Terminal", systemImage: "apple.terminal")
         }
-        .keyboardShortcut("t", modifiers: .command)
-        .help(showingTerminal ? "Hide the terminal" : "Open a terminal in this workspace")
+        .help(
+          showingTerminal
+            ? "Hide the terminal (⌘J)" : "Open a terminal in this workspace (⌘J)")
 
         Menu {
           WorkspaceActions(workspace: workspace)

@@ -59,6 +59,24 @@ final class AppModel {
   /// workspace — it is a preference about the layout, not about a workspace.
   var detailsCollapsed = false
 
+  var terminalVisibleForSelection: Bool {
+    guard let url = selection else { return false }
+    return terminalWorkspaces.contains(url)
+  }
+
+  /// Shows or hides the selected workspace's terminal.
+  ///
+  /// On the model rather than the view so the menu can drive it whatever has focus,
+  /// including the terminal itself.
+  func toggleTerminal() {
+    guard let url = selection else { return }
+    if terminalWorkspaces.contains(url) {
+      terminalWorkspaces.remove(url)
+    } else {
+      terminalWorkspaces.insert(url)
+    }
+  }
+
   /// The font embedded terminals render with.
   var terminalFont: NSFont {
     TerminalFont.font(library.terminalFont, size: library.terminalFontSize)

@@ -24,6 +24,12 @@ struct GroveApp: App {
         .keyboardShortcut("n")
       }
       CommandGroup(after: .toolbar) {
+        Button(model.terminalVisibleForSelection ? "Hide Terminal" : "Show Terminal") {
+          model.toggleTerminal()
+        }
+        .keyboardShortcut("j", modifiers: .command)
+        .disabled(model.selection == nil)
+
         Button("Rescan") { Task { await model.rescan() } }
           .keyboardShortcut("r")
       }
