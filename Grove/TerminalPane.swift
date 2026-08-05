@@ -22,7 +22,11 @@ struct TerminalPane: View {
   /// Cleared when the last shell exits, so `exit` puts the window back.
   @Binding var showing: Bool
 
-  @State private var selected: String?
+  /// Also in the model, so returning to a workspace lands on the tab you left.
+  private var selected: String? {
+    get { model.terminalTabs[workspace.url] }
+    nonmutating set { model.terminalTabs[workspace.url] = newValue }
+  }
 
   /// Somewhere a shell can run: the workspace itself, or one of its worktrees.
   private struct Target: Identifiable {

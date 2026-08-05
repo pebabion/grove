@@ -6,9 +6,26 @@ struct WorkspaceDetail: View {
   let workspace: Workspace
 
   @State private var expandedLogs: Set<String> = []
-  @State private var showingTerminal = false
-  @State private var showingDetails = true
   @State private var hoveringSummary = false
+
+  /// Both live in the model, so switching workspaces and coming back does not
+  /// reset them. A running terminal that hides itself when you look away is worse
+  /// than no terminal.
+  private var showingTerminal: Bool {
+    get { model.terminalWorkspaces.contains(workspace.url) }
+    nonmutating set {
+      if newValue {
+        model.terminalWorkspaces.insert(workspace.url)
+      } else {
+        model.terminalWorkspaces.remove(workspace.url)
+      }
+    }
+  }
+
+  private var showingDetails: Bool {
+    get { !model.detailsCollapsed }
+    nonmutating set { model.detailsCollapsed = !newValue }
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -33,8 +50,11 @@ struct WorkspaceDetail: View {
       }
 
       if showingTerminal {
-        TerminalPane(workspace: workspace, showing: $showingTerminal)
-          .frame(maxHeight: .infinity)
+        TerminalPane(
+          workspace: workspace,
+          showing: Binding(get: { showingTerminal }, set: { showingTerminal = $0 })
+        )
+        .frame(maxHeight: .infinity)
       } else if !showingDetails {
         Spacer()
       }

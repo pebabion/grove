@@ -47,6 +47,18 @@ final class AppModel {
   /// Live shells, one per worktree. Held here so they survive navigating away.
   let terminals = TerminalSessions()
 
+  /// Which workspaces have their terminal pane open, and which tab each is on.
+  ///
+  /// Kept here rather than as view state: SwiftUI discards a detail view's state
+  /// when the selection changes, so an open terminal appeared to vanish on coming
+  /// back to a workspace even though its shell was still running.
+  var terminalWorkspaces: Set<URL> = []
+  var terminalTabs: [URL: String] = [:]
+
+  /// Whether the repo list is collapsed. One setting for the window, not per
+  /// workspace — it is a preference about the layout, not about a workspace.
+  var detailsCollapsed = false
+
   /// The font embedded terminals render with.
   var terminalFont: NSFont {
     TerminalFont.font(library.terminalFont, size: library.terminalFontSize)
@@ -268,6 +280,12 @@ final class AppModel {
     isBusy = true
     defer { isBusy = false }
     do {
+      // The folder is about to move. A shell inside it would be left with a
+      // working directory that no longer exists.
+      terminals.closeAll(under: workspace.url)
+      terminalWorkspaces.remove(workspace.url)
+      terminalTabs.removeValue(forKey: workspace.url)
+
       let moved = try await service.rename(
         workspace: workspace,
         to: newName,
@@ -311,6 +329,8 @@ final class AppModel {
     defer { isBusy = false }
     do {
       terminals.closeAll(under: workspace.url)
+      terminalWorkspaces.remove(workspace.url)
+      terminalTabs.removeValue(forKey: workspace.url)
       try await service.teardown(
         workspace: workspace,
         library: library,
