@@ -61,6 +61,24 @@ final class TerminalSession: Identifiable {
     )
   }
 
+  /// Puts the keyboard into this terminal.
+  ///
+  /// Retried briefly: the view has no window for the first frame or two after
+  /// SwiftUI inserts it, and `makeFirstResponder` on a view with no window does
+  /// nothing at all.
+  func focus() {
+    Task { @MainActor [weak self] in
+      for _ in 0..<20 {
+        guard let self else { return }
+        if let window = view.window {
+          window.makeFirstResponder(view)
+          return
+        }
+        try? await Task.sleep(for: .milliseconds(25))
+      }
+    }
+  }
+
   func terminate() {
     guard !hasExited else { return }
     view.terminate()
