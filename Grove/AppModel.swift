@@ -101,11 +101,6 @@ final class AppModel {
     selectSession(session)
   }
 
-  /// Posts a notification straight away, to check they arrive.
-  func sendTestNotification() async {
-    await notifier.postTest()
-  }
-
   /// Notifies unless the user is already looking at the session.
   ///
   /// A notification for the window in front of you is noise, and the sidebar dot

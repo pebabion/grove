@@ -64,15 +64,6 @@ final class SessionNotifier {
     }
   }
 
-  /// Posts one immediately, for checking that notifications arrive at all.
-  ///
-  /// Worth having as a button: the ordinary path stays silent while you are looking
-  /// at the session, so "nothing happened" is both the correct behaviour and the
-  /// symptom of it being broken, and there is no way to tell which from the outside.
-  func postTest() async {
-    await post(.waiting, session: "Test", workspace: "Grove", id: UUID())
-  }
-
   /// Asks once, then remembers. Asking on every notification would be a sheet per
   /// turn until the user answered.
   private func isAllowed() async -> Bool {
