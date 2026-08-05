@@ -172,9 +172,12 @@ struct TeardownSheet: View {
     guard let pr = model.pullRequest(for: member)?.pullRequest else { return nil }
     switch pr.state {
     case "MERGED":
-      return ("merged", .green, "Pull request #\(pr.number) was merged")
+      return ("merged", .green, "Pull request #" + String(pr.number) + " was merged")
     case "CLOSED":
-      return ("closed unmerged", .orange, "Pull request #\(pr.number) was closed without merging")
+      return (
+        "closed unmerged", .orange,
+        "Pull request #" + String(pr.number) + " was closed without merging"
+      )
     default:
       return nil
     }

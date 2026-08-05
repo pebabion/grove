@@ -238,7 +238,7 @@ struct WorkspaceDetail: View {
             let url = URL(string: pr.url)
           {
             Divider()
-            Link("Open Pull Request #\(pr.number)", destination: url)
+            Link("Open Pull Request " + String(pr.number), destination: url)
           }
           Divider()
           Button("Re-run Setup") {
