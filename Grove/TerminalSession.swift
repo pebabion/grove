@@ -167,6 +167,17 @@ final class TerminalSessions {
     sessions.removeValue(forKey: directory.path)?.terminate()
   }
 
+  /// Restyles every live shell.
+  ///
+  /// Setting the font on a running view is enough — SwiftTerm rebuilds its metrics
+  /// and reports the new cell size to the PTY, so anything full-screen redraws to
+  /// fit. Without this, a change in Settings only reached the next shell started.
+  func applyFont(_ font: NSFont) {
+    for session in sessions.values {
+      session.view.font = font
+    }
+  }
+
   /// Ends every session inside a directory that is about to disappear.
   ///
   /// Removing a worktree while a shell sits in it leaves that shell with a

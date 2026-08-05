@@ -390,6 +390,7 @@ struct TerminalSettings: View {
             set: {
               model.library.terminalFont = $0
               model.saveLibrary()
+              model.applyTerminalFont()
             })
         ) {
           ForEach(TerminalFont.monospacedFamilies, id: \.self) { family in
@@ -404,6 +405,7 @@ struct TerminalSettings: View {
             set: {
               model.library.terminalFontSize = $0
               model.saveLibrary()
+              model.applyTerminalFont()
             }),
           in: 9...24,
           step: 1
@@ -430,13 +432,6 @@ struct TerminalSettings: View {
           .background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
       }
 
-      Section {
-        Text(
-          "Applies to terminals opened from now on. Shells already running keep the font they started with."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
     }
     .formStyle(.grouped)
   }

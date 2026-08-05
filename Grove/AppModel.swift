@@ -117,6 +117,11 @@ final class AppModel {
     return session
   }
 
+  /// Restyles the shells already running, after a change in Settings.
+  func applyTerminalFont() {
+    terminals.applyFont(terminalFont)
+  }
+
   /// The font embedded terminals render with.
   var terminalFont: NSFont {
     TerminalFont.font(library.terminalFont, size: library.terminalFontSize)
