@@ -12,9 +12,15 @@ packages:
   # months of work — PTY handling, VT100 parsing, a screen buffer, rendering,
   # resize, selection. MIT licensed. Used by the app target only, so GroveCore
   # stays dependency-free and `swift test` never fetches anything.
+  #
+  # 1.15 ships a Metal shader. Xcode 16 bundles the Metal toolchain, which is what
+  # CI runs; Xcode 26 makes it a separate 688MB download, so a local build needs
+  # `xcodebuild -downloadComponent MetalToolchain` once. Worth it: 1.14 renders
+  # local input immediately and applies backpressure to PTY reads, which is the
+  # difference between typing feeling instant and feeling laggy.
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
-    exactVersion: 1.11.2
+    from: 1.15.0
 
 targets:
   Grove:

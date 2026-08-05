@@ -19,6 +19,8 @@ struct TerminalViewBridge: NSViewRepresentable {
 struct TerminalPane: View {
   @Environment(AppModel.self) private var model
   let workspace: Workspace
+  /// Cleared when the last shell exits, so `exit` puts the window back.
+  @Binding var showing: Bool
 
   @State private var selected: String?
 
@@ -36,7 +38,7 @@ struct TerminalPane: View {
     // touching more than one repo.
     var all = [Target(label: "workspace", url: workspace.url, repoName: nil)]
     all += workspace.members
-      .filter { FileManager.default.fileExists(atPath: $0.url.path) }
+      .filter { $0.state != .pending }
       .map { Target(label: $0.repoName, url: $0.url, repoName: $0.repoName) }
     return all
   }
@@ -52,6 +54,23 @@ struct TerminalPane: View {
       terminal
     }
     .background(Color(nsColor: .textBackgroundColor))
+    .task(id: current?.id) {
+      // Only on open or on picking a tab. Starting from the body would resurrect
+      // a shell the moment it exited.
+      guard let target = current else { return }
+      model.terminals.start(
+        at: target.url, label: target.label,
+        environment: model.toolPaths.processEnvironment())
+    }
+    .onChange(of: liveSessions) { _, live in
+      // `exit` in the last tab means the pane has nothing left to show.
+      if live == 0 { showing = false }
+    }
+  }
+
+  /// How many of this workspace's tabs have a shell in them.
+  private var liveSessions: Int {
+    targets.count { model.terminals.isRunning(at: $0.url) }
   }
 
   private var tabStrip: some View {
@@ -105,29 +124,21 @@ struct TerminalPane: View {
 
   @ViewBuilder
   private var terminal: some View {
-    if let target = current,
-      let session = model.terminals.session(
-        at: target.url, label: target.label,
-        environment: model.toolPaths.processEnvironment())
-    {
+    if let target = current, let session = model.terminals.existing(at: target.url) {
       // Identified by directory so switching tabs swaps views rather than reusing
       // one and rewiring it.
       TerminalViewBridge(session: session)
         .id(session.id)
-        .overlay(alignment: .top) {
-          if session.hasExited {
-            Text("The shell exited. Close the tab to start another.")
-              .font(.caption)
-              .padding(6)
-              .background(.thinMaterial, in: Capsule())
-              .padding(.top, 6)
-          }
-        }
     } else {
-      Text("No directory to open a shell in yet.")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      // Reached after `exit` in a tab that is not the last one.
+      Button("Start a shell here") {
+        guard let target = current else { return }
+        model.terminals.start(
+          at: target.url, label: target.label,
+          environment: model.toolPaths.processEnvironment())
+      }
+      .buttonStyle(.link)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 }

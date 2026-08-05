@@ -22,6 +22,11 @@ final class TerminalSession: Identifiable {
   var title: String = ""
   var hasExited = false
 
+  /// Called once when the shell exits, so the owner can forget the session.
+  /// Without this, `exit` left a dead view on screen and the next redraw started
+  /// a replacement shell, which looked like nothing had happened.
+  var onExit: (@MainActor () -> Void)?
+
   /// Retained deliberately. See the note on this type.
   let view: LocalProcessTerminalView
 
@@ -87,7 +92,11 @@ final class TerminalSession: Identifiable {
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
       let session = session
-      Task { @MainActor in session?.hasExited = true }
+      Task { @MainActor in
+        guard let session, !session.hasExited else { return }
+        session.hasExited = true
+        session.onExit?()
+      }
     }
   }
 }
@@ -106,15 +115,22 @@ final class TerminalSessions {
   /// The shell to run. See ``UserShell`` for why the environment is not trusted.
   private var loginShell: String { UserShell.path }
 
-  /// A shell in `directory`, started if there is not one already.
+  func existing(at directory: URL) -> TerminalSession? {
+    guard let session = sessions[directory.path], !session.hasExited else { return nil }
+    return session
+  }
+
+  /// Starts a shell in `directory`, or returns the one already there.
   ///
-  /// Keyed by directory rather than by repo, so the workspace root gets one too —
-  /// which is where you want to be for anything spanning the repos.
-  func session(at directory: URL, label: String, environment: [String: String])
+  /// Only ever called from an explicit action — opening the pane or picking a tab.
+  /// Creating sessions from a view body meant a shell that had just exited was
+  /// replaced on the very next redraw.
+  @discardableResult
+  func start(at directory: URL, label: String, environment: [String: String])
     -> TerminalSession?
   {
     guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
-    if let existing = sessions[directory.path], !existing.hasExited { return existing }
+    if let existing = existing(at: directory) { return existing }
 
     let session = TerminalSession(
       worktree: directory,
@@ -122,6 +138,9 @@ final class TerminalSessions {
       environment: environment,
       shell: loginShell
     )
+    session.onExit = { [weak self] in
+      self?.sessions.removeValue(forKey: directory.path)
+    }
     sessions[directory.path] = session
     return session
   }

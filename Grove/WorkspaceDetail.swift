@@ -32,7 +32,7 @@ struct WorkspaceDetail: View {
       }
 
       if showingTerminal {
-        TerminalPane(workspace: workspace)
+        TerminalPane(workspace: workspace, showing: $showingTerminal)
           .frame(maxHeight: .infinity)
       } else if !showingDetails {
         Spacer()
