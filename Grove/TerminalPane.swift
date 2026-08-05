@@ -63,10 +63,7 @@ struct TerminalPane: View {
       // a shell the moment it exited.
       guard let target = current else { return }
       // Opening a terminal, or picking a tab, means wanting to type in it.
-      model.terminals.start(
-        at: target.url, label: target.label,
-        environment: model.toolPaths.processEnvironment(), font: model.terminalFont
-      )?.focus()
+      model.startTerminal(at: target.url)
     }
     .onChange(of: liveSessions) { _, live in
       // `exit` in the last tab means the pane has nothing left to show.
@@ -141,12 +138,9 @@ struct TerminalPane: View {
         .background(Color(nsColor: session.view.nativeBackgroundColor))
     } else {
       // Reached after `exit` in a tab that is not the last one.
-      Button("Start a shell here") {
+      Button("Start a shell here (⌘J)") {
         guard let target = current else { return }
-        model.terminals.start(
-          at: target.url, label: target.label,
-          environment: model.toolPaths.processEnvironment(), font: model.terminalFont
-        )?.focus()
+        model.startTerminal(at: target.url)
       }
       .buttonStyle(.link)
       .frame(maxWidth: .infinity, maxHeight: .infinity)

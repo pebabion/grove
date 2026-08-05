@@ -24,7 +24,7 @@ struct GroveApp: App {
         .keyboardShortcut("n")
       }
       CommandGroup(after: .toolbar) {
-        Button(model.terminalVisibleForSelection ? "Hide Terminal" : "Show Terminal") {
+        Button(model.terminalCommandTitle) {
           model.toggleTerminal()
         }
         .keyboardShortcut("j", modifiers: .command)

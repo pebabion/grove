@@ -59,22 +59,54 @@ final class AppModel {
   /// workspace — it is a preference about the layout, not about a workspace.
   var detailsCollapsed = false
 
-  var terminalVisibleForSelection: Bool {
-    guard let url = selection else { return false }
-    return terminalWorkspaces.contains(url)
+  /// What ⌘J will do next, for the menu item to say.
+  var terminalCommandTitle: String {
+    guard let workspace = selectedWorkspace else { return "Show Terminal" }
+    guard terminalWorkspaces.contains(workspace.url) else { return "Show Terminal" }
+    return terminals.existing(at: currentTerminalDirectory(for: workspace)) == nil
+      ? "Start Shell" : "Hide Terminal"
   }
 
-  /// Shows or hides the selected workspace's terminal.
+  /// The directory the workspace's front tab points at. Tabs are keyed by path, so
+  /// the tab is the directory.
+  private func currentTerminalDirectory(for workspace: Workspace) -> URL {
+    guard let path = terminalTabs[workspace.url] else { return workspace.url }
+    return URL(filePath: path)
+  }
+
+  /// Shows the terminal, starts a shell in it, or hides it — whichever is the
+  /// sensible next step.
   ///
   /// On the model rather than the view so the menu can drive it whatever has focus,
-  /// including the terminal itself.
+  /// including the terminal itself. Pressing it on a tab whose shell has exited
+  /// starts another rather than hiding a pane with nothing in it, which is what
+  /// "Start a shell here" does when clicked.
   func toggleTerminal() {
-    guard let url = selection else { return }
-    if terminalWorkspaces.contains(url) {
-      terminalWorkspaces.remove(url)
-    } else {
-      terminalWorkspaces.insert(url)
+    guard let workspace = selectedWorkspace else { return }
+
+    guard terminalWorkspaces.contains(workspace.url) else {
+      terminalWorkspaces.insert(workspace.url)
+      return
     }
+
+    let directory = currentTerminalDirectory(for: workspace)
+    if terminals.existing(at: directory) == nil {
+      startTerminal(at: directory)
+    } else {
+      terminalWorkspaces.remove(workspace.url)
+    }
+  }
+
+  @discardableResult
+  func startTerminal(at directory: URL) -> TerminalSession? {
+    let session = terminals.start(
+      at: directory,
+      label: directory.lastPathComponent,
+      environment: toolPaths.processEnvironment(),
+      font: terminalFont
+    )
+    session?.focus()
+    return session
   }
 
   /// The font embedded terminals render with.
