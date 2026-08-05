@@ -6,16 +6,27 @@ struct WorkspaceDetail: View {
   let workspace: Workspace
 
   @State private var expandedLogs: Set<String> = []
+  @State private var showingTerminal = false
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
-        header
-        repoList
-        addRepoSection
+    // Split rather than stacked, so the terminal can be given as much of the
+    // window as the work needs.
+    VSplitView {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 20) {
+          header
+          repoList
+          addRepoSection
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .padding(24)
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(minHeight: 140)
+
+      if showingTerminal {
+        TerminalPane(workspace: workspace)
+          .frame(minHeight: 180, idealHeight: 320)
+      }
     }
     .navigationTitle(workspace.name)
     .toolbar {
@@ -27,6 +38,13 @@ struct WorkspaceDetail: View {
         }
         .help(
           model.editorName.map { "Open in \($0)" } ?? "Reveal in Finder — pick an app in Settings")
+
+        Button {
+          showingTerminal.toggle()
+        } label: {
+          Label("Terminal", systemImage: "apple.terminal")
+        }
+        .help(showingTerminal ? "Hide the terminal" : "Open a terminal in each repo")
 
         Menu {
           WorkspaceActions(workspace: workspace)

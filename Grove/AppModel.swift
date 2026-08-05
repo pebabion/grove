@@ -44,6 +44,9 @@ final class AppModel {
   var isDownloadingUpdate = false
   var updateStage: UpdateStage?
 
+  /// Live shells, one per worktree. Held here so they survive navigating away.
+  let terminals = TerminalSessions()
+
   private let store = JSONStore()
   private var sweepTask: Task<Void, Never>?
 
@@ -287,6 +290,9 @@ final class AppModel {
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     isBusy = true
     defer { isBusy = false }
+    // A shell sitting in a directory that is about to go would be left with a
+    // deleted working directory, and whatever it launched still running.
+    terminals.closeAll(under: member.url)
     await service.removeRepo(
       member, from: workspace, library: library, deleteBranch: deleteBranch,
       onUpdate: handler(forWorkspaceAt: workspace.url))
@@ -299,6 +305,7 @@ final class AppModel {
     isBusy = true
     defer { isBusy = false }
     do {
+      terminals.closeAll(under: workspace.url)
       try await service.teardown(
         workspace: workspace,
         library: library,
