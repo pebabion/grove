@@ -99,6 +99,23 @@ final class SessionNotifier {
   private final class Handler: NSObject, UNUserNotificationCenterDelegate {
     weak var notifier: SessionNotifier?
 
+    /// Shows the notification even when Grove is the app in front.
+    ///
+    /// Without this, macOS accepts a notification from the frontmost app and then
+    /// silently declines to draw it — `add` succeeds, nothing appears, and there is
+    /// no error anywhere to explain it. Grove needs the banner in exactly that case:
+    /// looking at one workspace while a session in another finishes is the whole
+    /// point, and Grove is still the front app.
+    func userNotificationCenter(
+      _ center: UNUserNotificationCenter,
+      willPresent notification: UNNotification,
+      withCompletionHandler completionHandler:
+        @escaping (UNNotificationPresentationOptions) ->
+        Void
+    ) {
+      completionHandler([.banner, .sound, .list])
+    }
+
     func userNotificationCenter(
       _ center: UNUserNotificationCenter,
       didReceive response: UNNotificationResponse,

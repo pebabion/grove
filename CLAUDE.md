@@ -124,3 +124,21 @@ progress bar keeps working.
 `requestAuthorization` is granted for an ad-hoc signed app opened through Finder. Run
 the executable inside the bundle directly and the same call fails with "Notifications
 are not allowed for this application", which looks like a signing problem and is not.
+
+### Two silent failures between `add` and a visible banner
+
+Both of these accept the notification and show nothing, with no error to read.
+
+**The app must be signed as a bundle.** A bundle carrying only the linker's ad-hoc
+signature on its executable is refused permission: `requestAuthorization` fails with
+`UNErrorDomain error 1`. `make app` therefore signs after building, since
+`CODE_SIGNING_ALLOWED=NO` leaves it in exactly that state. Check with `codesign -dvv`
+— the identifier must be `com.pebabion.Grove`, not `Grove`, and `--verify --strict`
+must pass. Location matters too: a bundle under `/private/tmp` is refused whatever
+its signature.
+
+**The delegate must implement `willPresent`.** macOS drops notifications from the
+frontmost app unless the delegate returns presentation options. `add` succeeds and
+nothing is drawn. This is not an edge case for Grove: watching one workspace while a
+session in another finishes leaves Grove frontmost, which is the case the feature
+exists for.
