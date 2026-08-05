@@ -41,22 +41,12 @@ final class TerminalSession: Identifiable {
     delegate.session = self
     view.processDelegate = delegate
 
-    // A login shell, so the user's own profile is what runs — the whole point is
-    // that this behaves like their terminal.
-    var variables = environment
-    // Claude Code and anything else with a full-screen interface need to know the
-    // terminal can do colour and cursor addressing.
-    variables["TERM"] = "xterm-256color"
-    variables["COLORTERM"] = "truecolor"
-    // Say which terminal this is, as every terminal should. Without it the shell
-    // inherits whatever launched Grove — so a Grove session started from Ghostty
-    // would claim to be Ghostty, and anything keying features off this would
-    // guess wrong.
-    variables["TERM_PROGRAM"] = "Grove"
-    variables["TERM_PROGRAM_VERSION"] =
-      Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
-    // Programs that shell out to an editor should not open one inside themselves.
-    variables.removeValue(forKey: "EDITOR")
+    // A deliberate environment, not an inherited one. See TerminalEnvironment.
+    let variables = TerminalEnvironment.build(
+      from: environment,
+      termProgram: "Grove",
+      programVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+    )
 
     view.startProcess(
       executable: shell,
