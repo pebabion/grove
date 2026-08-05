@@ -27,6 +27,18 @@ app: project
 	xcodebuild -project Grove.xcodeproj -scheme Grove -configuration Debug \
 		-destination 'platform=macOS' -derivedDataPath build \
 		CODE_SIGNING_ALLOWED=NO build | tail -3
+	@$(MAKE) --no-print-directory sign
+
+# macOS will not grant notification permission to a bundle whose only signature is
+# the one the linker leaves on the executable. CODE_SIGNING_ALLOWED=NO above skips
+# Xcode's signing, which needs a developer identity nobody should need to build
+# this, so the bundle is signed ad-hoc here instead. That is also what seals the
+# resources and gives the signature the bundle identifier rather than "Grove" —
+# without it, requestAuthorization fails with UNErrorDomain error 1 and the feature
+# looks broken in a way that has nothing to do with its code.
+sign:
+	@codesign --force --sign - $(APP)
+	@codesign --verify --strict $(APP) && echo "signed $(APP)"
 
 run: app
 	open $(APP)

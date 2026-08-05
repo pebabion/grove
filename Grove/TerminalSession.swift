@@ -105,13 +105,22 @@ final class TerminalSession: Identifiable {
 
   /// Reads a progress report and signals if the session has stopped working.
   private func report(oscNine payload: String) {
-    guard let reported = SessionProgress.parse(oscNine: payload) else { return }
+    guard let reported = SessionProgress.parse(oscNine: payload) else {
+      Log.sessions.note("osc 9 not a progress report: \(payload)")
+      return
+    }
     let signal = monitor.received(reported, at: Date())
     isWorking = monitor.isWorking
+    Log.sessions.note(
+      "progress \(String(describing: reported)) -> signal \(String(describing: signal))"
+    )
     if let signal { self.signal(signal) }
   }
 
   private func signal(_ signal: SessionSignal) {
+    Log.sessions.note(
+      "signal \(String(describing: signal)), handler attached: \(self.onSignal != nil)"
+    )
     onSignal?(signal)
   }
 

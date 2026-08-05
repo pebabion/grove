@@ -35,23 +35,32 @@ final class GroveTerminalView: LocalProcessTerminalView {
   /// be taken the direct way.
   override func bell(source: Terminal) {
     super.bell(source: source)
+    Log.sessions.note("bell")
     onBell?()
   }
 
   /// Starts listening for progress reports.
   ///
-  /// Called after the process starts, because `terminal` does not exist until then.
   /// Registering a handler for OSC 9 replaces SwiftTerm's own, so the parsed report
-  /// is handed back to it afterwards and its progress bar keeps working.
+  /// is handed back to it afterwards and its progress bar keeps working. Handlers
+  /// survive a resize: `setupOptions` calls `terminal.setup(isReset:)` on every
+  /// bounds change, and that leaves the parser's registrations alone — checked,
+  /// because a handler quietly dropped on first layout would look exactly like a
+  /// feature that never worked.
   func watchProgress() {
-    guard let terminal else { return }
+    guard let terminal else {
+      Log.sessions.problem("no terminal to watch: progress reports will never arrive")
+      return
+    }
     terminal.registerOscHandler(code: 9) { [weak self] payload in
       let text = String(decoding: payload, as: UTF8.self)
       Task { @MainActor in
+        Log.sessions.note("osc 9 payload: \(text)")
         self?.onOscNine?(text)
         self?.forwardToSwiftTerm(text)
       }
     }
+    Log.sessions.note("watching progress reports")
   }
 
   private func forwardToSwiftTerm(_ payload: String) {

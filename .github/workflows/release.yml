@@ -72,8 +72,18 @@ jobs:
         # notarisation; until those secrets exist, an ad-hoc signature at least
         # gives the bundle a stable identity on the machine that runs it.
         run: |
-          codesign --force --deep --sign - build/Build/Products/Release/Grove.app
-          codesign --verify --verbose build/Build/Products/Release/Grove.app
+          app=build/Build/Products/Release/Grove.app
+          codesign --force --deep --sign - "$app"
+          codesign --verify --strict --verbose "$app"
+          # The signature must carry the bundle identifier, not the executable's
+          # name. A bundle left with only the linker's ad-hoc signature says
+          # "Grove" here, and macOS then refuses it notification permission --
+          # which looks like a bug in the feature rather than in the build.
+          identifier=$(codesign -dvv "$app" 2>&1 | sed -n 's/^Identifier=//p')
+          if [ "$identifier" != "com.pebabion.Grove" ]; then
+            echo "signed with identifier '$identifier', expected com.pebabion.Grove"
+            exit 1
+          fi
 
       - name: Make the disk image
         run: |

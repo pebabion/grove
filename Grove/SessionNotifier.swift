@@ -32,7 +32,14 @@ final class SessionNotifier {
   }
 
   func post(_ signal: SessionSignal, session: String, workspace: String, id: UUID) async {
-    guard Self.isAvailable, await isAllowed() else { return }
+    guard Self.isAvailable else {
+      Log.sessions.problem("no bundle identifier, so notifications are unavailable")
+      return
+    }
+    guard await isAllowed() else {
+      Log.sessions.problem("not allowed to notify")
+      return
+    }
 
     let content = UNMutableNotificationContent()
     content.title = session
@@ -49,15 +56,34 @@ final class SessionNotifier {
 
     let request = UNNotificationRequest(
       identifier: UUID().uuidString, content: content, trigger: nil)
-    try? await center.add(request)
+    do {
+      try await center.add(request)
+      Log.sessions.note("posted for \(session)")
+    } catch {
+      Log.sessions.problem("posting failed: \(error.localizedDescription)")
+    }
+  }
+
+  /// Posts one immediately, for checking that notifications arrive at all.
+  ///
+  /// Worth having as a button: the ordinary path stays silent while you are looking
+  /// at the session, so "nothing happened" is both the correct behaviour and the
+  /// symptom of it being broken, and there is no way to tell which from the outside.
+  func postTest() async {
+    await post(.waiting, session: "Test", workspace: "Grove", id: UUID())
   }
 
   /// Asks once, then remembers. Asking on every notification would be a sheet per
   /// turn until the user answered.
   private func isAllowed() async -> Bool {
     if let authorization { return authorization }
-    let granted =
-      (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+    var granted = false
+    do {
+      granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
+    } catch {
+      Log.sessions.problem("asking permission failed: \(error.localizedDescription)")
+    }
+    Log.sessions.note("permission granted: \(granted)")
     authorization = granted
     return granted
   }

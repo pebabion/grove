@@ -431,14 +431,19 @@ struct TerminalSettings: View {
               model.saveLibrary()
             })
         )
+        Button("Send a test notification") {
+          Task { await model.sendTestNotification() }
+        }
+        .controlSize(.small)
+        .disabled(!(model.library.notifySessionEvents ?? true))
       } header: {
         Text("Notifications")
       } footer: {
         Text(
           "Agents report when they start and stop working, so Grove can notify you "
             + "once a session finishes or stops to ask something — unless you are "
-            + "already looking at it. Sessions waiting for you keep a dot in the "
-            + "sidebar either way."
+            + "already looking at it, which is why the test button exists. Sessions "
+            + "waiting for you keep a dot in the sidebar either way."
         )
         .font(.caption)
         .foregroundStyle(.secondary)

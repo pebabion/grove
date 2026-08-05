@@ -101,14 +101,26 @@ final class AppModel {
     selectSession(session)
   }
 
+  /// Posts a notification straight away, to check they arrive.
+  func sendTestNotification() async {
+    await notifier.postTest()
+  }
+
   /// Notifies unless the user is already looking at the session.
   ///
   /// A notification for the window in front of you is noise, and the sidebar dot
   /// covers the case where they are in Grove but looking elsewhere.
   private func handle(_ signal: SessionSignal, from session: TerminalSession) {
-    guard library.notifySessionEvents ?? true else { return }
-    guard !isWatching(session) else { return }
+    guard library.notifySessionEvents ?? true else {
+      Log.sessions.note("notifications are switched off")
+      return
+    }
+    guard !isWatching(session) else {
+      Log.sessions.note("already watching \(session.displayName)")
+      return
+    }
 
+    Log.sessions.note("notifying for \(session.displayName)")
     session.needsAttention = true
     let workspace = session.workspace.lastPathComponent
     let name = session.displayName
