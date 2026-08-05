@@ -48,11 +48,19 @@ struct WorkspaceDetail: View {
       }
 
       if showingTerminal {
-        TerminalPane(
-          workspace: workspace,
-          showing: Binding(get: { showingTerminal }, set: { showingTerminal = $0 })
-        )
-        .frame(maxHeight: .infinity)
+        // Draggable only when the two share the window. With the repo list hidden
+        // there is nothing to trade height with, so the terminal simply fills.
+        if showingDetails {
+          TerminalResizer(
+            height: Binding(
+              get: { model.terminalHeight },
+              set: { model.terminalHeight = $0 }
+            )
+          )
+          terminalPane.frame(height: model.terminalHeight)
+        } else {
+          terminalPane.frame(maxHeight: .infinity)
+        }
       } else if !showingDetails {
         Spacer()
       }
@@ -89,6 +97,13 @@ struct WorkspaceDetail: View {
         .menuIndicator(.hidden)
       }
     }
+  }
+
+  private var terminalPane: some View {
+    TerminalPane(
+      workspace: workspace,
+      showing: Binding(get: { showingTerminal }, set: { showingTerminal = $0 })
+    )
   }
 
   /// Name, branch and size on one line, and the whole row toggles the rest.
