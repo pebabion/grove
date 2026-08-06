@@ -254,3 +254,21 @@ callback Grove hands out is now one or the other.
 through `RepoLibrary.update(_:_:)`, which finds the repo by name at the moment of the
 change and does nothing if it is gone. Never carry an index across an await or across
 a view update.
+
+## Measuring coverage
+
+```bash
+swift test --enable-code-coverage
+BIN=.build/arm64-apple-macosx/debug/GroveCorePackageTests.xctest/Contents/MacOS/GroveCorePackageTests
+PROF=.build/arm64-apple-macosx/debug/codecov/default.profdata
+xcrun llvm-cov report "$BIN" -instr-profile="$PROF" -ignore-filename-regex='(Tests|\.build)'
+```
+
+Only `GroveCore` is measured, which is the point of keeping logic there. Chase the
+files where a gap costs something — `WorkspaceService` moves worktrees, `Shell` runs
+every git call — rather than the percentage.
+
+**A test holding a `Sandbox` in `_` deletes the repositories it just made.** The
+sandbox removes its directory when released, so a fixture that returns one while the
+caller discards it fails with "No such file or directory" from git. Bind it by name
+for the length of the test.

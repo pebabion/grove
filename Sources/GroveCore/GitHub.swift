@@ -73,11 +73,19 @@ public struct GitHub: Sendable {
       in: worktree
     )
     guard let result, result.succeeded else { return .unknown }
+    return Self.reading(gh: result.standardOutput)
+  }
 
-    let data = Data(result.standardOutput.utf8)
-    guard let found = try? JSONDecoder().decode([PullRequest].self, from: data) else {
-      return .unknown
-    }
+  /// Reads what `gh pr list --json` printed.
+  ///
+  /// Separate from the call so the three outcomes can be tested without a network or a
+  /// signed-in `gh`. The distinction that matters is between an empty list, which means
+  /// the branch has no pull request, and output that cannot be read, which means the
+  /// question went unanswered. Caching the second as the first would leave a branch
+  /// looking pull-requestless for as long as the answer keeps.
+  static func reading(gh output: String) -> PullRequestLookup {
+    guard let found = try? JSONDecoder().decode([PullRequest].self, from: Data(output.utf8))
+    else { return .unknown }
     return found.first.map(PullRequestLookup.found) ?? .none
   }
 }
