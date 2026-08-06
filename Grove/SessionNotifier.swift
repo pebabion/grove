@@ -81,7 +81,9 @@ final class SessionNotifier {
     // from sitting under Claude Code's more precise reason for the same moment.
     let request = UNNotificationRequest(
       identifier: id.uuidString, content: content, trigger: nil)
-    center.add(request) { error in
+    // @Sendable for the same reason as everywhere else callbacks arrive: the closure
+    // must not carry main-actor isolation into a queue that is not the main one.
+    center.add(request) { @Sendable error in
       if let error {
         Task { @MainActor in
           Log.sessions.problem("posting failed: \(error.localizedDescription)")
@@ -99,7 +101,7 @@ final class SessionNotifier {
       done(authorization)
       return
     }
-    center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+    center.requestAuthorization(options: [.alert, .sound, .badge]) { @Sendable granted, error in
       Task { @MainActor in
         if let error {
           Log.sessions.problem("asking permission failed: \(error.localizedDescription)")

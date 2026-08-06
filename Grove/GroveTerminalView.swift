@@ -52,7 +52,11 @@ final class GroveTerminalView: LocalProcessTerminalView {
       Log.sessions.problem("no terminal to watch: progress reports will never arrive")
       return
     }
-    terminal.registerOscHandler(code: 9) { [weak self] payload in
+    // @Sendable so the closure is not main-actor isolated. SwiftTerm calls it from
+    // whatever thread is feeding the terminal, and a closure written inside a
+    // main-actor type is checked for the main executor as it is entered — which traps
+    // off the main thread before any hop inside it can run.
+    terminal.registerOscHandler(code: 9) { @Sendable [weak self] payload in
       let text = String(decoding: payload, as: UTF8.self)
       Task { @MainActor in
         Log.sessions.note("osc 9 payload: \(text)")

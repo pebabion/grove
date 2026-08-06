@@ -232,3 +232,25 @@ solvable.
 
 Rebuilt on create, on adding or removing a repo, and on rescan, since a branch can add
 or drop a skill without Grove doing anything.
+
+## Crashes, and the two shapes they took
+
+Both were found by reading `~/Library/Logs/DiagnosticReports/Grove-*.ips` rather than
+by guessing. Parse one with `json.loads` on the first line for the header and on the
+rest for the body; the faulting thread's frames carry symbols.
+
+**A callback written inside main-actor code is checked for the main executor as it is
+entered.** A closure written in a `@MainActor` method is main-actor isolated, so Swift
+asserts the executor when the closure is called. LaunchServices calls
+`NSWorkspace.open`'s completion on its own queue, and the app trapped in
+`dispatch_assert_queue_fail` — while opening an editor. Hopping inside the closure
+does not save it: the check runs first. Use the awaiting form of the API, or write
+`{ @Sendable ... }` so the closure carries no isolation and hop explicitly. Every
+callback Grove hands out is now one or the other.
+
+**Positions are not identities.** `RepoEditor` held an index and read
+`library.repos[index]`; deleting a repo left it subscripting past the end.
+`redetectBase` resolved an index, awaited the network, then wrote through it. Both go
+through `RepoLibrary.update(_:_:)`, which finds the repo by name at the moment of the
+change and does nothing if it is gone. Never carry an index across an await or across
+a view update.

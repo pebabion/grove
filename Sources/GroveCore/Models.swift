@@ -237,6 +237,18 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     repos.first { $0.name == name }
   }
 
+  /// Changes one repo, found by name at the moment of the change.
+  ///
+  /// Nothing happens if it is gone. Positions are not identities: an index resolved
+  /// earlier and used later points at a different repo once one is removed, or at
+  /// nothing at all. A view holding an index crashed on `repos[index]` after a repo
+  /// was deleted, and a base-branch detection wrote its result through an index it
+  /// had resolved before awaiting the network.
+  public mutating func update(_ name: String, _ change: (inout RepoEntry) -> Void) {
+    guard let index = repos.firstIndex(where: { $0.name == name }) else { return }
+    change(&repos[index])
+  }
+
   /// How many colours the palette holds. The library declares it so both the
   /// slot picker and the views agree.
   public static let colorSlots = 12

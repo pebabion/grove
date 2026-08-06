@@ -386,13 +386,15 @@ final class AppModel {
 
   /// Re-reads a repo's default branch from its remote.
   func redetectBase(for name: String) async {
-    guard let git, let index = library.repos.firstIndex(where: { $0.name == name }) else { return }
-    let repo = library.repos[index]
+    guard let git, let repo = library[name] else { return }
     guard let detected = (try? await git.defaultBranch(repo: repo.url)) ?? nil else {
       errorMessage = "Could not read origin/HEAD for \(name). Is the remote reachable?"
       return
     }
-    library.repos[index].base = detected
+    // By name again on the way back: the library can change while the network is
+    // answering, and an index resolved beforehand would by then mean a different repo
+    // or none at all.
+    library.update(name) { $0.base = detected }
     saveLibrary()
   }
 
@@ -923,12 +925,19 @@ final class AppModel {
 
   /// Hands `url` to a specific application, reporting a refusal rather than
   /// swallowing it the way `open -a` did.
+  /// Opens a file with a chosen application.
+  ///
+  /// The awaiting form, not the completion handler. LaunchServices calls a completion
+  /// handler on its own queue, and a closure written inside a main-actor method is
+  /// itself main-actor isolated, so Swift checks the executor as the closure is
+  /// entered and traps when it is not the main one. Hopping inside the closure does
+  /// not help: the check happens first. This crashed the app when opening an editor.
   private func open(_ url: URL, withApplicationAt application: URL) {
-    NSWorkspace.shared.open(
-      [url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration()
-    ) { [weak self] _, error in
-      guard let error else { return }
-      Task { @MainActor in
+    Task { [weak self] in
+      do {
+        _ = try await NSWorkspace.shared.open(
+          [url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
+      } catch {
         self?.errorMessage =
           "Could not open \(url.lastPathComponent) with "
           + "\(application.deletingPathExtension().lastPathComponent): "

@@ -111,6 +111,11 @@ struct LibraryDecodingTests {
     #expect(library.repos.map(\.name) == ["backend"])
     #expect(library.toolOverrides.isEmpty)
     #expect(library.terminalFont == nil)
+    // Every field added since has to survive the same file. This test fails the moment
+    // one is added without decodeIfPresent, which is the whole point of it.
+    #expect(library.notifySessionEvents == nil)
+    #expect(library.claudeHooks == nil)
+    #expect(library.terminalMouseReporting == nil)
   }
 
   @Test("reads a repo entry missing its base branch")

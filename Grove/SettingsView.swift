@@ -90,10 +90,8 @@ struct LibrarySettings: View {
       .frame(minWidth: 220, idealWidth: 240)
 
       Group {
-        if let name = selection,
-          let index = model.library.repos.firstIndex(where: { $0.name == name })
-        {
-          RepoEditor(index: index)
+        if let name = selection, model.library[name] != nil {
+          RepoEditor(name: name)
         } else {
           VStack(spacing: 6) {
             Text("Select a repo")
@@ -139,15 +137,30 @@ struct LibrarySettings: View {
 }
 
 /// Editor for one library entry.
+///
+/// Identified by name rather than by position. A view holding an index outlives the
+/// arrangement it was resolved from: deleting a repo left this one subscripting past
+/// the end of the array, which crashed the app.
 struct RepoEditor: View {
   @Environment(AppModel.self) private var model
-  let index: Int
+  let name: String
 
   @State private var showingVariables = false
 
-  private var repo: RepoEntry { model.library.repos[index] }
+  private var repo: RepoEntry? { model.library[name] }
 
   var body: some View {
+    if let repo {
+      editor(for: repo)
+    } else {
+      // Removed while its editor was open. Nothing to edit and nothing to report.
+      Text("This repo is no longer in the library.")
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
+
+  private func editor(for repo: RepoEntry) -> some View {
     Form {
       Section {
         LabeledContent("Name", value: repo.name)
@@ -214,11 +227,12 @@ struct RepoEditor: View {
   private func hookSection(
     title: String, note: String, script: String, text: Binding<String>
   ) -> some View {
-    let committed = repo.url
+    let committed = repo?.url
       .appending(path: GroveLocations.hookDirectoryName)
       .appending(path: script)
-    let exists = FileManager.default.fileExists(atPath: committed.path)
-    let executable = FileManager.default.isExecutableFile(atPath: committed.path)
+    let exists = committed.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+    let executable =
+      committed.map { FileManager.default.isExecutableFile(atPath: $0.path) } ?? false
 
     Section {
       TextEditor(text: text)
@@ -258,9 +272,9 @@ struct RepoEditor: View {
 
   private func binding(_ path: WritableKeyPath<RepoEntry, String>) -> Binding<String> {
     Binding(
-      get: { model.library.repos[index][keyPath: path] },
-      set: {
-        model.library.repos[index][keyPath: path] = $0
+      get: { model.library[name]?[keyPath: path] ?? "" },
+      set: { value in
+        model.library.update(name) { $0[keyPath: path] = value }
         model.saveLibrarySoon()
       }
     )
@@ -268,9 +282,9 @@ struct RepoEditor: View {
 
   private func optionalBinding(_ path: WritableKeyPath<RepoEntry, String?>) -> Binding<String> {
     Binding(
-      get: { model.library.repos[index][keyPath: path] ?? "" },
-      set: {
-        model.library.repos[index][keyPath: path] = $0.isEmpty ? nil : $0
+      get: { model.library[name]?[keyPath: path] ?? "" },
+      set: { value in
+        model.library.update(name) { $0[keyPath: path] = value.isEmpty ? nil : value }
         model.saveLibrarySoon()
       }
     )
