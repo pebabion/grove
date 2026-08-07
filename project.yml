@@ -20,7 +20,7 @@ packages:
   # difference between typing feeling instant and feeling laggy.
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
-    from: 1.15.0
+    from: 1.16.0
 
 targets:
   Grove:

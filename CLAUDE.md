@@ -272,3 +272,19 @@ every git call — rather than the percentage.
 sandbox removes its directory when released, so a fixture that returns one while the
 caller discards it fails with "No such file or directory" from git. Bind it by name
 for the length of the test.
+
+## Redraw corruption on resize
+
+Claude Code repaints in place: measured through a PTY across a live resize, it sends
+42 erase-lines and two cursor moves, no full clear, and it never uses the alternate
+screen. So what is on screen afterwards depends entirely on the terminal reflowing the
+old content exactly where the program assumes it is.
+
+SwiftTerm 1.16.0 fixes both halves of that — "stale rows when repainting in place while
+scrolled back", and erase-line no longer changing soft-wrap boundaries. Keep the
+dependency current when a redraw bug shows up; this one was released the same day it
+was reported.
+
+The buffer itself was never the problem. Feeding wrapped lines and resizing shows every
+logical line intact at both 500 and 10,000 lines of scrollback, so a garbled screen is
+a rendering or cursor-position fault, not lost content.
