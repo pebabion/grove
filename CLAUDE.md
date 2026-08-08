@@ -301,7 +301,8 @@ Measured, by starting it under different values and counting `OSC 9;4`:
 So the progress signal Grove's notifications were built on never arrives, and the log
 shows it: many sessions started, not one `osc 9 payload` line. Claude Code rings no
 bell either. **For Claude Code, the hook relay is not an improvement, it is the only
-route.** The progress path still earns its place for other tools, and for Claude Code
+route**, which is why one switch turns on notifications and installs the relay
+together — a separate switch for it was a question nobody wanted to answer. The progress path still earns its place for other tools, and for Claude Code
 if it ever recognises more terminals.
 
 Do not fix this by claiming to be ghostty. Terminal detection gates more than

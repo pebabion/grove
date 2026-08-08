@@ -439,19 +439,9 @@ struct TerminalSettings: View {
         Toggle(
           "Tell me when a session is waiting",
           isOn: Binding(
-            get: { model.library.notifySessionEvents ?? true },
-            set: {
-              model.library.notifySessionEvents = $0
-              model.saveLibrary()
-            })
+            get: { model.notificationsEnabled },
+            set: { model.setNotifications($0) })
         )
-        Toggle(
-          "Let Claude Code report directly (required for Claude Code)",
-          isOn: Binding(
-            get: { model.library.claudeHooks ?? false },
-            set: { model.setClaudeHooks($0) })
-        )
-        .disabled(!(model.library.notifySessionEvents ?? true))
         if let problem = model.hookError {
           Text(problem)
             .font(.caption)
@@ -461,17 +451,12 @@ struct TerminalSettings: View {
         Text("Notifications")
       } footer: {
         Text(
-          "Agents report when they start and stop working, so Grove can notify you "
-            + "once a session finishes or stops to ask something — unless you are "
-            + "already looking at it. Sessions waiting for you keep a dot in the "
-            + "sidebar either way.\n\n"
-            + "Claude Code needs the second switch. It only reports progress to a "
-            + "handful of terminals it recognises by name, and Grove is not one of "
-            + "them, so without this it says nothing Grove can hear. Reporting "
-            + "directly also tells finishing apart from asking a question, in Claude "
-            + "Code's own words. It registers a script in Claude Code's settings, "
-            + "keeping the hooks already there and copying the file first; turning it "
-            + "off takes the script back out."
+          "Grove tells you when a session finishes or stops to ask you something, "
+            + "unless you are already looking at it. Either way, a session waiting for "
+            + "you keeps a dot in the sidebar.\n\n"
+            + "Claude Code cannot tell Grove on its own, so this registers a small "
+            + "script in its settings and removes it again when you switch this off. "
+            + "Hooks you already have are left alone, and the file is copied first."
         )
         .font(.caption)
         .foregroundStyle(.secondary)

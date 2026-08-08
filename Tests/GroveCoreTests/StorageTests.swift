@@ -114,8 +114,25 @@ struct LibraryDecodingTests {
     // Every field added since has to survive the same file. This test fails the moment
     // one is added without decodeIfPresent, which is the whole point of it.
     #expect(library.notifySessionEvents == nil)
-    #expect(library.claudeHooks == nil)
     #expect(library.terminalMouseReporting == nil)
+  }
+
+  @Test("reads a file holding a setting Grove no longer has")
+  func toleratesRemovedFields() throws {
+    // The other direction from the test above, and now relied on: claudeHooks was
+    // folded into the notifications switch, so every library file already on disk
+    // carries a key nothing decodes any more.
+    let library = try decode(
+      """
+      {
+        "repos": [{"name": "backend", "path": "~/b"}],
+        "claudeHooks": true,
+        "somethingFromTheFuture": 42
+      }
+      """)
+
+    #expect(library.repos.map(\.name) == ["backend"])
+    #expect(library.notifySessionEvents == nil)
   }
 
   @Test("reads a repo entry missing its base branch")

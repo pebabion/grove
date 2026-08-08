@@ -106,11 +106,10 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   public var terminalForeground: String?
 
   /// Whether to post a notification when a session finishes or asks for input.
+  ///
+  /// One switch for the whole feature. What it needs underneath — the Claude Code
+  /// relay — follows it, because nobody wants to be asked about that separately.
   public var notifySessionEvents: Bool?
-
-  /// Whether Claude Code reports directly to Grove through its hooks, which is what
-  /// lets Grove tell "needs your input" from "finished".
-  public var claudeHooks: Bool?
 
   /// Whether programs in the terminal receive mouse events.
   ///
@@ -136,7 +135,6 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalFontSize: Double? = nil,
     terminalForeground: String? = nil,
     notifySessionEvents: Bool? = nil,
-    claudeHooks: Bool? = nil,
     terminalMouseReporting: Bool? = nil,
     toolOverrides: [String: String] = [:]
   ) {
@@ -150,7 +148,6 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.terminalFontSize = terminalFontSize
     self.terminalForeground = terminalForeground
     self.notifySessionEvents = notifySessionEvents
-    self.claudeHooks = claudeHooks
     self.terminalMouseReporting = terminalMouseReporting
     self.toolOverrides = toolOverrides
   }
@@ -165,7 +162,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   enum CodingKeys: String, CodingKey {
     case repos, workspaceRoot, editor, editorPath, terminalPath, branchPrefix
     case terminalFont, terminalFontSize, terminalForeground
-    case notifySessionEvents, claudeHooks, terminalMouseReporting, toolOverrides
+    case notifySessionEvents, terminalMouseReporting, toolOverrides
   }
 
   public init(from decoder: Decoder) throws {
@@ -181,7 +178,6 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalFontSize = try container.decodeIfPresent(Double.self, forKey: .terminalFontSize)
     terminalForeground = try container.decodeIfPresent(String.self, forKey: .terminalForeground)
     notifySessionEvents = try container.decodeIfPresent(Bool.self, forKey: .notifySessionEvents)
-    claudeHooks = try container.decodeIfPresent(Bool.self, forKey: .claudeHooks)
     terminalMouseReporting = try container.decodeIfPresent(
       Bool.self, forKey: .terminalMouseReporting)
     toolOverrides =

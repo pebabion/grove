@@ -144,7 +144,7 @@ final class AppModel {
   }
 
   private func notify(_ signal: SessionSignal, from session: TerminalSession, saying: String?) {
-    guard library.notifySessionEvents ?? true else {
+    guard notificationsEnabled else {
       Log.sessions.note("notifications are switched off")
       return
     }
@@ -161,8 +161,24 @@ final class AppModel {
     notifier.post(signal, session: name, workspace: workspace, id: id, saying: saying)
   }
 
-  /// Turns the Claude Code relay on or off, and reports what went wrong if it did.
-  func setClaudeHooks(_ enabled: Bool) {
+  /// Whether Grove notifies at all. One switch, because the parts underneath it are
+  /// not a decision anyone wants to make.
+  ///
+  /// Off until asked for: turning it on edits Claude Code's settings, and nothing
+  /// should do that to a machine on the strength of a default.
+  var notificationsEnabled: Bool { library.notifySessionEvents ?? false }
+
+  /// Turns notifications on or off, including everything they need to work.
+  ///
+  /// The Claude Code relay goes in and comes out with the switch. On its own the
+  /// terminal hears nothing from Claude Code — it reports progress only to terminals
+  /// it recognises by name, and Grove is not one — so a notifications setting that
+  /// left the relay to the user would be a setting that does nothing.
+  func setNotifications(_ enabled: Bool) {
+    hookError = nil
+    library.notifySessionEvents = enabled
+    saveLibrary()
+
     do {
       if enabled {
         try hookRelay.install()
@@ -172,13 +188,12 @@ final class AppModel {
         try hookRelay.uninstall()
         hookReporting.removeAll()
       }
-      library.claudeHooks = enabled
-      saveLibrary()
     } catch {
       Log.hooks.problem(
         "could not \(enabled ? "install" : "remove") the relay: \(error.localizedDescription)")
+      // Notifications stay on: the terminal's own signals still work for tools that
+      // send them, and saying so is better than silently turning the switch back.
       hookError = error.localizedDescription
-      library.claudeHooks = hookRelay.isInstalled
     }
   }
 
@@ -289,7 +304,12 @@ final class AppModel {
     loadLibrary()
     // After loadLibrary, not before: the setting being read lives in the library, and
     // reading it first gets the default rather than the answer.
-    if library.claudeHooks == true, hookRelay.isInstalled { hookRelay.start() }
+    if notificationsEnabled {
+      // Put the relay back if it has gone -- an update replaces the app, and someone
+      // may have tidied Claude Code's settings by hand since.
+      if !hookRelay.isInstalled { try? hookRelay.install() }
+      hookRelay.start()
+    }
     // Turn an older "Zed" style name into the app it meant, so nobody has to
     // pick their editor a second time.
     let before = library
