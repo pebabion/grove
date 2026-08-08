@@ -44,7 +44,7 @@ final class HookRelay {
       try? current.write(to: ClaudeHooks.settingsBackupURL, options: .atomic)
     }
 
-    let updated = try ClaudeHooks.installed(in: current, command: ClaudeHooks.scriptURL.path)
+    let updated = try ClaudeHooks.installed(in: current, command: ClaudeHooks.command)
     try updated.write(to: ClaudeHooks.settingsURL, options: .atomic)
     Log.hooks.note("relay installed")
   }

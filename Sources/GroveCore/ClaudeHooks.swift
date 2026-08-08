@@ -37,6 +37,19 @@ public enum ClaudeHooks {
     supportDirectory.appending(path: "claude-settings-backup.json")
   }
 
+  /// What to register as the hook command: the script's path, quoted.
+  ///
+  /// Claude Code runs a hook command through `/bin/sh -c`, and the script lives under
+  /// "Application Support", which has a space in it. Registered bare, the shell split
+  /// the path and every hook failed with "/bin/sh:
+  /// /Users/you/Library/Application: No such file or directory".
+  public static var command: String { quoting(scriptURL.path) }
+
+  /// Wraps a path so a shell treats it as one word, whatever is in it.
+  static func quoting(_ path: String) -> String {
+    "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+  }
+
   /// Writes each payload where Grove will find it, complete.
   ///
   /// The payload is written outside the watched directory and moved in, because
@@ -105,12 +118,23 @@ public enum ClaudeHooks {
     return try data(from: root)
   }
 
-  public static func isInstalled(in settings: Data) -> Bool {
+  /// Whether the relay is registered, and registered in a form that will run.
+  ///
+  /// Compares the whole command rather than looking for Grove's script anywhere in it,
+  /// so an entry left by an older version — the same path, unquoted, which no shell
+  /// could run — reads as not installed and gets rewritten rather than left to fail.
+  public static func isInstalled(in settings: Data, command: String = ClaudeHooks.command)
+    -> Bool
+  {
     guard let root = try? object(from: settings),
       let hooks = root["hooks"] as? [String: Any]
     else { return false }
     return events.allSatisfy { event in
-      (hooks[event] as? [[String: Any]] ?? []).contains { matchesGrove($0) }
+      (hooks[event] as? [[String: Any]] ?? []).contains { entry in
+        (entry["hooks"] as? [[String: Any]] ?? []).contains {
+          ($0["command"] as? String) == command
+        }
+      }
     }
   }
 

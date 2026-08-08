@@ -309,3 +309,18 @@ Do not fix this by claiming to be ghostty. Terminal detection gates more than
 progress: a program told it is talking to ghostty may use the kitty keyboard protocol
 and other things Grove does not implement, and Shift + Return already had to be
 hand-fitted here.
+
+## Quote the hook command
+
+Claude Code runs a hook command through `/bin/sh -c`, and Grove's relay lives under
+"Application Support", which has a space in it. Registered bare, every hook failed with
+
+    /bin/sh: /Users/you/Library/Application: No such file or directory
+
+and the failure showed up in the user's session, not in Grove. `ClaudeHooks.command`
+quotes the path; nothing should register it any other way.
+
+`isInstalled` compares the whole command rather than looking for the script path
+somewhere inside it, so an entry left by a version that did not quote reads as *not*
+installed and gets rewritten on the next launch. Recognising Grove's entry loosely is
+still right for removal — that has to find the broken ones too.

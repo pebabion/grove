@@ -110,7 +110,7 @@ struct ClaudeHooksTests {
   @Test("registers for both events")
   func registersBoth() throws {
     let installed = try ClaudeHooks.installed(in: existing, command: command)
-    #expect(ClaudeHooks.isInstalled(in: installed))
+    #expect(ClaudeHooks.isInstalled(in: installed, command: command))
     let hooks = json(installed)["hooks"] as? [String: Any]
     #expect(hooks?["Notification"] != nil)
     #expect(hooks?["Stop"] != nil)
@@ -128,7 +128,7 @@ struct ClaudeHooksTests {
   func removesOnlyOurs() throws {
     let installed = try ClaudeHooks.installed(in: existing, command: command)
     let removed = try ClaudeHooks.removed(from: installed)
-    #expect(!ClaudeHooks.isInstalled(in: removed))
+    #expect(!ClaudeHooks.isInstalled(in: removed, command: command))
 
     let result = json(removed)
     let hooks = result["hooks"] as? [String: Any]
@@ -155,9 +155,13 @@ struct ClaudeHooksTests {
 
   @Test("works from an empty or hookless file")
   func fromNothing() throws {
-    #expect(ClaudeHooks.isInstalled(in: try ClaudeHooks.installed(in: Data(), command: command)))
+    #expect(
+      ClaudeHooks.isInstalled(
+        in: try ClaudeHooks.installed(in: Data(), command: command), command: command))
     let bare = Data("{}".utf8)
-    #expect(ClaudeHooks.isInstalled(in: try ClaudeHooks.installed(in: bare, command: command)))
+    #expect(
+      ClaudeHooks.isInstalled(
+        in: try ClaudeHooks.installed(in: bare, command: command), command: command))
   }
 
   @Test("refuses to touch a settings file it cannot read")
@@ -192,5 +196,45 @@ struct ClaudeHooksTests {
     let capture = lines.first { $0.hasPrefix("cat >") }
     #expect(capture?.contains("$tmp") == true)
     #expect(capture?.contains("$dir") == false)
+  }
+}
+
+@Suite("registering a command a shell can actually run")
+struct HookCommandTests {
+  @Test("the script path is quoted")
+  func quotesThePath() {
+    // It lives under "Application Support". Registered bare, /bin/sh -c split it at the
+    // space and every hook failed with "/Users/you/Library/Application: No such file or
+    // directory".
+    #expect(ClaudeHooks.command.hasPrefix("'"))
+    #expect(ClaudeHooks.command.hasSuffix("'"))
+    #expect(ClaudeHooks.command.contains("Grove/claude-hook.sh"))
+  }
+
+  @Test("quoting survives an apostrophe in the path")
+  func quotesApostrophes() {
+    // Home directories have people's names in them.
+    let quoted = ClaudeHooks.quoting("/Users/o'brien/Library/Application Support/Grove/x.sh")
+    #expect(quoted == #"'/Users/o'\''brien/Library/Application Support/Grove/x.sh'"#)
+  }
+
+  @Test("an entry left unquoted by an older version reads as not installed")
+  func staleEntryIsNotInstalled() throws {
+    // So it gets rewritten rather than left in place failing on every turn.
+    let path = "/Users/me/Library/Application Support/Grove/claude-hook.sh"
+    let stale = try ClaudeHooks.installed(in: Data("{}".utf8), command: path)
+    #expect(!ClaudeHooks.isInstalled(in: stale, command: ClaudeHooks.quoting(path)))
+  }
+
+  @Test("rewriting a stale entry replaces it rather than adding another")
+  func rewriteReplaces() throws {
+    let path = "/Users/me/Library/Application Support/Grove/claude-hook.sh"
+    let stale = try ClaudeHooks.installed(in: Data("{}".utf8), command: path)
+    let fixed = try ClaudeHooks.installed(in: stale, command: ClaudeHooks.quoting(path))
+
+    #expect(ClaudeHooks.isInstalled(in: fixed, command: ClaudeHooks.quoting(path)))
+    let root = (try? JSONSerialization.jsonObject(with: fixed)) as? [String: Any]
+    let stop = (root?["hooks"] as? [String: Any])?["Stop"] as? [[String: Any]] ?? []
+    #expect(stop.count == 1)
   }
 }
