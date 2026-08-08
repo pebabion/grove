@@ -288,3 +288,23 @@ was reported.
 The buffer itself was never the problem. Feeding wrapped lines and resizing shows every
 logical line intact at both 500 and 10,000 lines of scrollback, so a garbled screen is
 a rendering or cursor-position fault, not lost content.
+
+## Claude Code will not report progress to Grove
+
+Measured, by starting it under different values and counting `OSC 9;4`:
+
+| `TERM_PROGRAM` | progress reports |
+| --- | --- |
+| unset, `Grove`, `iTerm.app`, `WezTerm` | none |
+| `ghostty` | yes |
+
+So the progress signal Grove's notifications were built on never arrives, and the log
+shows it: many sessions started, not one `osc 9 payload` line. Claude Code rings no
+bell either. **For Claude Code, the hook relay is not an improvement, it is the only
+route.** The progress path still earns its place for other tools, and for Claude Code
+if it ever recognises more terminals.
+
+Do not fix this by claiming to be ghostty. Terminal detection gates more than
+progress: a program told it is talking to ghostty may use the kitty keyboard protocol
+and other things Grove does not implement, and Shift + Return already had to be
+hand-fitted here.

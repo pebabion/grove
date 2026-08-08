@@ -446,7 +446,7 @@ struct TerminalSettings: View {
             })
         )
         Toggle(
-          "Let Claude Code report directly",
+          "Let Claude Code report directly (required for Claude Code)",
           isOn: Binding(
             get: { model.library.claudeHooks ?? false },
             set: { model.setClaudeHooks($0) })
@@ -465,10 +465,13 @@ struct TerminalSettings: View {
             + "once a session finishes or stops to ask something — unless you are "
             + "already looking at it. Sessions waiting for you keep a dot in the "
             + "sidebar either way.\n\n"
-            + "Reporting directly tells the two apart, since Claude Code says which "
-            + "it is in its own words. It registers a script in Claude Code's "
-            + "settings, keeping the hooks already there and copying the file first. "
-            + "Turning it off takes the script back out."
+            + "Claude Code needs the second switch. It only reports progress to a "
+            + "handful of terminals it recognises by name, and Grove is not one of "
+            + "them, so without this it says nothing Grove can hear. Reporting "
+            + "directly also tells finishing apart from asking a question, in Claude "
+            + "Code's own words. It registers a script in Claude Code's settings, "
+            + "keeping the hooks already there and copying the file first; turning it "
+            + "off takes the script back out."
         )
         .font(.caption)
         .foregroundStyle(.secondary)
