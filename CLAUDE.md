@@ -347,6 +347,19 @@ is a 1.4GB repository with no declared licence and no commits since June 2025.
 
 Two things were measured and both changed the design:
 
+- **Search uses fzf's scoring**, ported with its constants: a match just after a
+  separator or at a camelCase hump is worth far more than one mid-word, a run of adjacent
+  characters more than the sum of its parts, and the query's first character counts double
+  at a word start. Greedy leftmost matching -- what this replaced -- scored whatever it
+  found first, so scattered early letters beat letters sitting together further along. The
+  query is split on whitespace and each word matched independently: "people skill" has to
+  find `skills/system/people-search/SKILL.md`, and as one subsequence it cannot, because
+  the path holds no space.
+- **Compute the bonuses from the original text, not the folded copy.** Lowercasing first
+  throws away every camelCase hump before it can be scored, which silently disabled the
+  bonus that makes "gtv" find `GroveTerminalView`. Match against folded bytes, take
+  bonuses from the original; ASCII folding keeps the length so the two agree position for
+  position.
 - **Searching cost 91ms a keystroke** over 25,000 paths — what three real repos hold.
   Lowercasing and splitting into `Character`s per keystroke was most of it, and sorting
   every match was the rest. `FileIndex` folds each path to lowercase UTF-8 bytes once and

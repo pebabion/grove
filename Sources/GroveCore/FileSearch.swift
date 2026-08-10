@@ -26,29 +26,37 @@ public struct FileMatch: Sendable, Hashable, Identifiable {
 public struct FileIndex: Sendable {
   private struct Entry: Sendable {
     let match: FileMatch
-    /// Lowercased UTF-8 of the filename and of the whole path.
+    /// Lowercased UTF-8 of the filename and of the whole path, with the per-position
+    /// bonuses that go with them. The bonuses depend only on the text, so they are
+    /// computed here rather than on every keystroke.
     let name: [UInt8]
+    let nameBonuses: [Int32]
     let path: [UInt8]
+    let pathBonuses: [Int32]
   }
 
   private let entries: [Entry]
   public var count: Int { entries.count }
 
   public init(_ files: [FileMatch]) {
-    entries = files.map {
-      Entry(
-        match: $0,
-        name: Self.folded($0.name),
-        path: Self.folded($0.path))
+    entries = files.map { file in
+      // Bonuses come from the original text and matching from the folded copy. Folding
+      // first would have thrown away every camelCase hump before it could be scored,
+      // which is exactly the signal that makes "gtv" find GroveTerminalView. ASCII
+      // folding keeps the length, so the two agree position for position.
+      return Entry(
+        match: file,
+        name: Self.folded(file.name),
+        nameBonuses: FuzzyScore.bonuses(for: Array(file.name.utf8)),
+        path: Self.folded(file.path),
+        pathBonuses: FuzzyScore.bonuses(for: Array(file.path.utf8)))
     }
   }
 
   /// Lowercased ASCII bytes. Non-ASCII passes through unchanged, so a path with
   /// accented characters still matches exactly, just not case-insensitively.
   static func folded(_ text: String) -> [UInt8] {
-    Array(text.utf8).map { byte in
-      byte >= 65 && byte <= 90 ? byte + 32 : byte
-    }
+    Array(text.utf8).map { FuzzyScore.folded($0) }
   }
 
   /// Ranked matches for `query`, best first.
@@ -67,7 +75,17 @@ public struct FileIndex: Sendable {
         .map { $0 }
     }
 
-    let needle = Self.folded(trimmed)
+    // Split on whitespace and require every word, each matched on its own. A query is
+    // words, not one run of characters: "people skill" has to find
+    // skills/system/people-search/SKILL.md, and as a single subsequence it cannot,
+    // because the path holds no space.
+    let words =
+      trimmed
+      .split(whereSeparator: \.isWhitespace)
+      .map { Self.folded(String($0)) }
+    guard !words.isEmpty else {
+      return entries.map(\.match).sorted { $0.path < $1.path }.prefix(limit).map { $0 }
+    }
     // Kept as a running best rather than scored-then-sorted. A one-letter query matches
     // nearly every file, and sorting twenty-five thousand results took fifty
     // milliseconds a keystroke on its own -- longer than the scoring it followed.
@@ -75,17 +93,7 @@ public struct FileIndex: Sendable {
     best.reserveCapacity(limit)
 
     for entry in entries {
-      // A match on the filename beats one spread across directories, because that is
-      // almost always what was meant.
-      var score: Int
-      if let inName = Self.score(needle, in: entry.name) {
-        score = inName + 1000
-      } else if let inPath = Self.score(needle, in: entry.path) {
-        score = inPath
-      } else {
-        continue
-      }
-
+      guard let score = Self.score(words: words, in: entry) else { continue }
       let candidate = Ranked(match: entry.match, score: score)
       if best.count == limit, let worst = best.last, !Self.isBetter(candidate, than: worst) {
         continue
@@ -126,32 +134,34 @@ public struct FileIndex: Sendable {
     return low
   }
 
-  /// Scores `needle` as a subsequence of `haystack`, rewarding runs and early hits.
-  static func score(_ needle: [UInt8], in haystack: [UInt8]) -> Int? {
-    guard !needle.isEmpty else { return 0 }
-    var score = 0
-    var index = 0
-    var previousHit = -2
+  /// Scores every word against one file, or nil if any word is missing.
+  ///
+  /// Each word is scored where it does best — the filename or the whole path — with a
+  /// filename hit preferred, because a word someone types is usually the name of the
+  /// thing they want rather than a directory on the way to it. Words are matched
+  /// independently, so their order does not matter.
+  private static func score(words: [[UInt8]], in entry: Entry) -> Int? {
+    var total: Int32 = 0
+    for word in words {
+      let inName = FuzzyScore.score(word, in: entry.name, bonuses: entry.nameBonuses)
+        .map { $0 + Self.nameReward }
+      let inPath = FuzzyScore.score(word, in: entry.path, bonuses: entry.pathBonuses)
 
-    for byte in needle {
-      var hit = -1
-      while index < haystack.count {
-        if haystack[index] == byte {
-          hit = index
-          index += 1
-          break
-        }
-        index += 1
-      }
-      guard hit >= 0 else { return nil }
-      // Consecutive characters are the strongest signal that this is the intended file.
-      if hit == previousHit + 1 { score += 8 }
-      if hit == 0 { score += 4 }
-      previousHit = hit
+      guard let best = [inName, inPath].compactMap({ $0 }).max() else { return nil }
+      total += best
     }
-    // Prefer a tight match over one strung across a long name.
-    return score + max(0, 20 - haystack.count / 4)
+    // Averaged over the words, so a two-word query is not worth twice a one-word query
+    // and scores stay comparable between them.
+    return Int(total) / words.count
   }
+
+  /// What a filename match is worth over a path match.
+  ///
+  /// Clear but not absolute: fzf scores a short query in the low hundreds, so this
+  /// outranks an equally good path match without making a poor name match beat an
+  /// excellent path one.
+  private static let nameReward: Int32 = 96
+
 }
 
 /// Searching a list of files directly, without preparing an index first.
