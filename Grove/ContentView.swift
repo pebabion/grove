@@ -44,6 +44,11 @@ struct ContentView: View {
     ) { target in
       TeardownSheet(target: target)
     }
+    .sheet(
+      item: Binding(get: { model.browsingTarget }, set: { model.browsingTarget = $0 })
+    ) { workspace in
+      FileViewer(workspace: workspace)
+    }
     .onReceive(of: .newWorkspace) {
       if !model.library.repos.isEmpty { showingCreate = true }
     }

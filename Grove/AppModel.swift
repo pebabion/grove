@@ -33,6 +33,8 @@ final class AppModel {
   /// context menu and the detail pane's menu drive the same sheets.
   var renameTarget: Workspace?
   var teardownTarget: TeardownTarget?
+  /// The workspace whose files are being browsed, if any.
+  var browsingTarget: Workspace?
 
   /// Cached workspace sizes, and how many are still being measured.
   var sizes = SizeCache()
@@ -92,6 +94,20 @@ final class AppModel {
     activeSessions[session.workspace] = session.id
     session.needsAttention = false
     session.focus()
+  }
+
+  /// Every file the workspace's repos hold, for the file viewer to search.
+  ///
+  /// Asked of git per repo rather than walked: one call each, and it already leaves out
+  /// everything `.gitignore` covers.
+  func workspaceFiles(in workspace: Workspace) async -> [FileMatch] {
+    guard let git else { return [] }
+    var found: [FileMatch] = []
+    for member in workspace.members where member.state != .pending {
+      guard let paths = try? await git.listFiles(worktree: member.url) else { continue }
+      found += paths.map { FileMatch(path: $0, repo: member.repoName) }
+    }
+    return found
   }
 
   /// Brings a session on screen from wherever the user is: selects its workspace,

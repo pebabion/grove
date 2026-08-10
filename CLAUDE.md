@@ -324,3 +324,24 @@ quotes the path; nothing should register it any other way.
 somewhere inside it, so an entry left by a version that did not quote reads as *not*
 installed and gets rewritten on the next launch. Recognising Grove's entry loosely is
 still right for removal — that has to find the broken ones too.
+
+## Viewing files
+
+Read-only, deliberately. Agents rewrite these files while they are on screen, so
+anything that could save would need to know what changed underneath it, and Grove
+already opens a real editor in one click.
+
+Highlighting is highlight.js through JavaScriptCore (Highlightr), not tree-sitter.
+Tree-sitter is what an editor wants because it reparses as you type; nothing here is
+typed into. The grammar bundle that would make tree-sitter practical, CodeEditLanguages,
+is a 1.4GB repository with no declared licence and no commits since June 2025.
+
+Two things were measured and both changed the design:
+
+- **Searching cost 91ms a keystroke** over 25,000 paths — what three real repos hold.
+  Lowercasing and splitting into `Character`s per keystroke was most of it, and sorting
+  every match was the rest. `FileIndex` folds each path to lowercase UTF-8 bytes once and
+  keeps a running best `limit` instead of sorting the lot: 3.5ms.
+- **Highlighting costs about a millisecond per kilobyte** — 42ms for a middling source
+  file, near a second at the 1MB limit. It runs in an actor off the main one, once per
+  selection. Calling it from a view body means repeating it for every unrelated change.

@@ -71,6 +71,18 @@ public struct Git: Sendable {
 
   // MARK: - Worktrees
 
+  /// Every file git knows about in a worktree, repo-relative.
+  ///
+  /// `ls-files` rather than walking the directory: it is one call, it already skips
+  /// everything `.gitignore` covers, and it will not wander into `node_modules`.
+  /// Untracked files are included so something just written is still findable.
+  public func listFiles(worktree: URL) async throws -> [String] {
+    let output = try await run(
+      ["-C", worktree.path, "ls-files", "--cached", "--others", "--exclude-standard"],
+      in: worktree)
+    return output.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
+  }
+
   public func listWorktrees(repo: URL) async throws -> [WorktreeInfo] {
     let output = try await run(["-C", repo.path, "worktree", "list", "--porcelain"])
     return Self.parseWorktreeList(output)

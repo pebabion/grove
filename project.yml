@@ -21,6 +21,12 @@ packages:
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
     from: 1.16.0
+  # highlight.js in JavaScriptCore. Chosen over tree-sitter because a read-only view
+  # gains nothing from incremental reparsing, and the grammar bundles that would make
+  # tree-sitter practical are a 1.4GB repository with no declared licence.
+  Highlightr:
+    url: https://github.com/raspu/Highlightr
+    from: 2.3.0
 
 targets:
   Grove:
@@ -33,6 +39,8 @@ targets:
         product: GroveCore
       - package: SwiftTerm
         product: SwiftTerm
+      - package: Highlightr
+        product: Highlightr
     # An explicit plist, because GENERATE_INFOPLIST_FILE has no build setting for
     # CFBundleIconFile and the app icon has to be named somewhere.
     info:
