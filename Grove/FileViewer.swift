@@ -65,12 +65,28 @@ struct FileViewer: View {
     index.matches(for: query)
   }
 
+  /// How large the sheet opens.
+  ///
+  /// A sheet takes its content's ideal size, so a minimum alone leaves it at the
+  /// minimum however much screen there is — which made a file viewer the size of a
+  /// dialog. Most of the screen, capped so it does not become unwieldy on a large
+  /// display.
+  private static var idealSize: CGSize {
+    let screen = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1600, height: 1000)
+    return CGSize(
+      width: min(1600, screen.width * 0.85),
+      height: min(1100, screen.height * 0.88))
+  }
+
   var body: some View {
     HSplitView {
       list
       detail
     }
-    .frame(minWidth: 900, minHeight: 520)
+    .frame(
+      minWidth: 820, idealWidth: Self.idealSize.width, maxWidth: .infinity,
+      minHeight: 520, idealHeight: Self.idealSize.height, maxHeight: .infinity
+    )
     .task { await load() }
   }
 
@@ -118,7 +134,7 @@ struct FileViewer: View {
       .padding(.horizontal, 8)
       .padding(.vertical, 5)
     }
-    .frame(minWidth: 260, idealWidth: 300, maxWidth: 420)
+    .frame(minWidth: 240, idealWidth: 320, maxWidth: 460)
     .onAppear { searchFocused = true }
   }
 
