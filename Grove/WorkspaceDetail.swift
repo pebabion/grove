@@ -22,6 +22,17 @@ struct WorkspaceDetail: View {
     }
   }
 
+  private var showingFiles: Bool {
+    get { model.fileWorkspaces.contains(workspace.url) }
+    nonmutating set {
+      if newValue {
+        model.fileWorkspaces.insert(workspace.url)
+      } else {
+        model.fileWorkspaces.remove(workspace.url)
+      }
+    }
+  }
+
   private var showingDetails: Bool {
     get { !model.detailsCollapsed }
     nonmutating set { model.detailsCollapsed = !newValue }
@@ -35,7 +46,11 @@ struct WorkspaceDetail: View {
       summaryBar
       Divider()
 
-      if showingDetails {
+      // Files take the place of the repo list rather than sitting over the window:
+      // reading one is something you do while working, not instead of it.
+      if showingFiles {
+        FileBrowser(workspace: workspace)
+      } else if showingDetails {
         ScrollView {
           VStack(alignment: .leading, spacing: 20) {
             repoList
@@ -48,9 +63,9 @@ struct WorkspaceDetail: View {
       }
 
       if showingTerminal {
-        // Draggable only when the two share the window. With the repo list hidden
-        // there is nothing to trade height with, so the terminal simply fills.
-        if showingDetails {
+        // Draggable only when the two share the window. With nothing above it there is
+        // no height to trade, so the terminal simply fills.
+        if showingDetails || showingFiles {
           TerminalResizer(
             height: Binding(
               get: { model.terminalHeight },
@@ -61,13 +76,19 @@ struct WorkspaceDetail: View {
         } else {
           terminalPane.frame(maxHeight: .infinity)
         }
-      } else if !showingDetails {
+      } else if !showingDetails, !showingFiles {
         Spacer()
       }
     }
     .navigationTitle(workspace.name)
     .onChange(of: showingTerminal) { _, opened in
       // Opening a terminal is a statement about what you want the window for.
+      if opened { showingDetails = false }
+    }
+    .onChange(of: showingFiles) { _, opened in
+      // Files and the repo list want the same space, so one hides the other. Without
+      // this the disclosure row looks broken: it toggles something the files are
+      // covering.
       if opened { showingDetails = false }
     }
     .toolbar {
@@ -79,6 +100,13 @@ struct WorkspaceDetail: View {
         }
         .help(
           model.editorName.map { "Open in \($0)" } ?? "Reveal in Finder — pick an app in Settings")
+
+        Button {
+          showingFiles.toggle()
+        } label: {
+          Label("Files", systemImage: "doc.text.magnifyingglass")
+        }
+        .help(showingFiles ? "Hide files (⌘ + P)" : "Find a file in this workspace (⌘ + P)")
 
         Button {
           showingTerminal.toggle()
@@ -114,6 +142,7 @@ struct WorkspaceDetail: View {
   private var summaryBar: some View {
     Button {
       showingDetails.toggle()
+      if showingDetails { showingFiles = false }
     } label: {
       HStack(spacing: 8) {
         Image(systemName: "chevron.right")

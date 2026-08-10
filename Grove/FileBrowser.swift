@@ -39,14 +39,17 @@ struct SourceTextView: NSViewRepresentable {
   }
 }
 
-/// Find a file in the workspace and read it.
+/// Find a file in the workspace and read it, in the window rather than over it.
+///
+/// Part of the detail pane, taking the place of the repo list, so the terminal stays
+/// below it and the workspace stays selected. A sheet floating over the window blocked
+/// everything behind it to do a thing you want to do *while* working.
 ///
 /// Deliberately not an editor. Agents rewrite these files while they are on screen, so
 /// anything that could save would need to know what changed underneath it — and Grove
 /// already opens a real editor in one click.
-struct FileViewer: View {
+struct FileBrowser: View {
   @Environment(AppModel.self) private var model
-  @Environment(\.dismiss) private var dismiss
   let workspace: Workspace
 
   /// Prepared once when the sheet opens. Searching the raw list instead would redo the
@@ -65,28 +68,12 @@ struct FileViewer: View {
     index.matches(for: query)
   }
 
-  /// How large the sheet opens.
-  ///
-  /// A sheet takes its content's ideal size, so a minimum alone leaves it at the
-  /// minimum however much screen there is — which made a file viewer the size of a
-  /// dialog. Most of the screen, capped so it does not become unwieldy on a large
-  /// display.
-  private static var idealSize: CGSize {
-    let screen = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1600, height: 1000)
-    return CGSize(
-      width: min(1600, screen.width * 0.85),
-      height: min(1100, screen.height * 0.88))
-  }
-
   var body: some View {
     HSplitView {
       list
       detail
     }
-    .frame(
-      minWidth: 820, idealWidth: Self.idealSize.width, maxWidth: .infinity,
-      minHeight: 520, idealHeight: Self.idealSize.height, maxHeight: .infinity
-    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .task { await load() }
   }
 
@@ -134,7 +121,7 @@ struct FileViewer: View {
       .padding(.horizontal, 8)
       .padding(.vertical, 5)
     }
-    .frame(minWidth: 240, idealWidth: 320, maxWidth: 460)
+    .frame(minWidth: 220, idealWidth: 300, maxWidth: 420)
     .onAppear { searchFocused = true }
   }
 
@@ -157,7 +144,7 @@ struct FileViewer: View {
       VStack(spacing: 6) {
         Text("Select a file")
           .foregroundStyle(.secondary)
-        Text("Read-only. Press ⌘ + E to open it in your editor.")
+        Text("Read-only. ⌘ + E opens the selected file in your editor.")
           .font(.caption)
           .foregroundStyle(.tertiary)
       }
@@ -177,8 +164,6 @@ struct FileViewer: View {
       Button("Open in Editor") { model.openInEditor(url(of: file)) }
         .buttonStyle(.link)
         .keyboardShortcut("e")
-      Button("Done") { dismiss() }
-        .keyboardShortcut(.escape, modifiers: [])
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 7)

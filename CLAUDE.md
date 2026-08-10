@@ -327,6 +327,15 @@ still right for removal — that has to find the broken ones too.
 
 ## Viewing files
 
+In the window, not over it. Files take the place of the repo list in the detail pane,
+with the terminal still below and the existing resizer trading height between them.
+Reading a file is something you do *while* working, so a sheet was the wrong shape: it
+blocked everything behind it and could be neither moved nor resized.
+
+Files and the repo list want the same space, so opening one hides the other — in both
+directions, or the disclosure row toggles something the files are covering and looks
+broken.
+
 Read-only, deliberately. Agents rewrite these files while they are on screen, so
 anything that could save would need to know what changed underneath it, and Grove
 already opens a real editor in one click.

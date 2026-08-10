@@ -33,8 +33,6 @@ final class AppModel {
   /// context menu and the detail pane's menu drive the same sheets.
   var renameTarget: Workspace?
   var teardownTarget: TeardownTarget?
-  /// The workspace whose files are being browsed, if any.
-  var browsingTarget: Workspace?
 
   /// Cached workspace sizes, and how many are still being measured.
   var sizes = SizeCache()
@@ -67,6 +65,11 @@ final class AppModel {
   var terminalWorkspaces: Set<URL> = []
   var activeSessions: [URL: UUID] = [:]
 
+  /// Which workspaces are showing their files instead of their repo list. Kept here
+  /// for the same reason as the terminal: leaving a workspace and coming back should
+  /// not undo what you were reading.
+  var fileWorkspaces: Set<URL> = []
+
   /// How tall the terminal pane is when it shares the window with the repo list.
   /// Dragged by the divider between them, and kept for the same reason the rest of
   /// this is: switching workspaces should not reset it.
@@ -75,6 +78,14 @@ final class AppModel {
   /// Whether the repo list is collapsed. One setting for the window, not per
   /// workspace — it is a preference about the layout, not about a workspace.
   var detailsCollapsed = false
+
+  /// What ⌘ + P will do next, for the menu item to say.
+  var fileCommandTitle: String {
+    guard let workspace = selectedWorkspace, fileWorkspaces.contains(workspace.url) else {
+      return "Show Files"
+    }
+    return "Hide Files"
+  }
 
   /// What ⌘ + J will do next, for the menu item to say.
   var terminalCommandTitle: String {
@@ -235,6 +246,16 @@ final class AppModel {
     )
     if let session { selectSession(session) }
     return session
+  }
+
+  /// Shows or hides the file browser for the selected workspace.
+  func toggleFiles() {
+    guard let workspace = selectedWorkspace else { return }
+    if fileWorkspaces.contains(workspace.url) {
+      fileWorkspaces.remove(workspace.url)
+    } else {
+      fileWorkspaces.insert(workspace.url)
+    }
   }
 
   /// Shows the terminal, starts a session, or hides it — whichever comes next.

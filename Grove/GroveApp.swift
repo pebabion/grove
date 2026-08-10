@@ -33,8 +33,8 @@ struct GroveApp: App {
         Button("Rescan") { Task { await model.rescan() } }
           .keyboardShortcut("r")
 
-        Button("Find File…") {
-          model.browsingTarget = model.selectedWorkspace
+        Button(model.fileCommandTitle) {
+          model.toggleFiles()
         }
         .keyboardShortcut("p")
         .disabled(model.selection == nil)
