@@ -432,3 +432,14 @@ Two things were measured and both changed the design:
 - **Highlighting costs about a millisecond per kilobyte** — 42ms for a middling source
   file, near a second at the 1MB limit. It runs in an actor off the main one, once per
   selection. Calling it from a view body means repeating it for every unrelated change.
+
+## The shortcut guide
+
+`ShortcutGuide` fills the empty part of a workspace when the terminal and the files are
+both closed, and can be dismissed for good. It is the only place the shortcuts are written
+down for a reader, so **anything bound in the menus or a view belongs in that list**, and
+every line in it is a claim that has to be true.
+
+⌘ + Backspace belongs to the terminal, where it deletes to the start of the line. A menu
+key equivalent would take it, because menus are offered a key before any view is, which is
+why removing a workspace is ⌘ + Shift + Backspace.

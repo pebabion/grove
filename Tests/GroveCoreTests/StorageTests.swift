@@ -116,6 +116,7 @@ struct LibraryDecodingTests {
     #expect(library.notifySessionEvents == nil)
     #expect(library.terminalMouseReporting == nil)
     #expect(library.wrapsSourceText == nil)
+    #expect(library.hidesShortcutGuide == nil)
   }
 
   @Test("reads a file holding a setting Grove no longer has")

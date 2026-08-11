@@ -38,6 +38,28 @@ struct GroveApp: App {
         }
         .keyboardShortcut("p")
         .disabled(model.selection == nil)
+
+        Divider()
+
+        Button("Next Workspace") { model.selectWorkspace(offset: 1) }
+          .keyboardShortcut("]", modifiers: [.command, .shift])
+          .disabled(model.workspaces.count < 2)
+
+        Button("Previous Workspace") { model.selectWorkspace(offset: -1) }
+          .keyboardShortcut("[", modifiers: [.command, .shift])
+          .disabled(model.workspaces.count < 2)
+
+        Button("Open in Editor") {
+          if let workspace = model.selectedWorkspace { model.openInEditor(workspace.url) }
+        }
+        .keyboardShortcut("e", modifiers: [.command, .shift])
+        .disabled(model.selection == nil)
+
+        // Shift as well as Command, because ⌘ + Backspace belongs to the terminal, where
+        // it deletes to the start of the line. A menu shortcut would take it away.
+        Button("Remove Workspace…") { model.askToRemoveSelectedWorkspace() }
+          .keyboardShortcut(.delete, modifiers: [.command, .shift])
+          .disabled(model.selection == nil)
       }
     }
 

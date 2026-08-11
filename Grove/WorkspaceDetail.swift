@@ -79,6 +79,14 @@ struct WorkspaceDetail: View {
       } else if !showingDetails, !showingFiles {
         Spacer()
       }
+
+      // Only where there is nothing else to look at: the repo list is short, the terminal
+      // is closed and no file is open. It leaves as soon as the window has a job to do.
+      if showingDetails, !showingFiles, !showingTerminal,
+        model.library.hidesShortcutGuide != true
+      {
+        ShortcutGuide()
+      }
     }
     .navigationTitle(workspace.name)
     .onChange(of: showingTerminal) { _, opened in

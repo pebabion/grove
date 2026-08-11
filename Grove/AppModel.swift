@@ -250,6 +250,29 @@ final class AppModel {
     return session
   }
 
+  /// Moves the selection through the sidebar, wrapping at the ends.
+  ///
+  /// With a dozen workspaces, reaching for the mouse to change which one you are looking
+  /// at is the most frequent thing there is no key for.
+  func selectWorkspace(offset: Int) {
+    guard !workspaces.isEmpty else { return }
+    guard let current = workspaces.firstIndex(where: { $0.url == selection }) else {
+      selection = workspaces.first?.url
+      return
+    }
+    let next = (current + offset + workspaces.count) % workspaces.count
+    selection = workspaces[next].url
+  }
+
+  /// Opens the confirmation for removing the selected workspace.
+  ///
+  /// The shortcut opens the sheet rather than doing it: this is the one action that
+  /// destroys work, and it already has an audit to show first.
+  func askToRemoveSelectedWorkspace() {
+    guard let workspace = selectedWorkspace else { return }
+    teardownTarget = .whole(workspace)
+  }
+
   /// Shows or hides the file browser for the selected workspace.
   func toggleFiles() {
     guard let workspace = selectedWorkspace else { return }
