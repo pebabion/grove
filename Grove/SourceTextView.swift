@@ -217,6 +217,11 @@ struct SourceTextView: NSViewRepresentable {
   final class Coordinator {
     private var observer: NSObjectProtocol?
 
+    /// Main-actor because it touches the scroll view's own views. It is only ever
+    /// called from `makeNSView`, which is on the main actor already — but saying so is
+    /// what lets an older compiler agree. This built locally on Xcode 26 and failed CI
+    /// on Xcode 16 without it.
+    @MainActor
     func observe(scroll: NSScrollView, ruler: LineNumberRuler) {
       observer = NotificationCenter.default.addObserver(
         forName: NSView.boundsDidChangeNotification,
