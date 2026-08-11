@@ -126,7 +126,16 @@ struct ContentView: View {
     HStack(spacing: 6) {
       Group {
         if let busy = model.busyLabel {
-          ProgressView().controlSize(.small)
+          // A bar when the work can say how far along it is, a spinner when it cannot.
+          // A bar that fills at its own pace is a lie about progress.
+          if let fraction = model.busyFraction {
+            ProgressView(value: fraction)
+              .progressViewStyle(.linear)
+              .controlSize(.small)
+              .frame(width: 90)
+          } else {
+            ProgressView().controlSize(.small)
+          }
           Text(busy)
             .lineLimit(1)
             .truncationMode(.tail)

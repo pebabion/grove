@@ -48,6 +48,23 @@ public enum WorkspaceError: Error, LocalizedError, Sendable {
 }
 
 /// Creates, changes and tears down workspaces.
+/// How far through a run of work something is, and what it is doing.
+///
+/// A fraction as well as a sentence, so it can be drawn as a bar. Steps are counted in
+/// repos rather than in operations: one repo may have a teardown hook and a branch to
+/// delete where another has neither, and a bar that lurches because one repo had more to
+/// do is worse than one that moves evenly.
+public struct WorkOutline: Sendable, Equatable {
+  public let label: String
+  /// Between 0 and 1.
+  public let fraction: Double
+
+  public init(label: String, fraction: Double) {
+    self.label = label
+    self.fraction = min(1, max(0, fraction))
+  }
+}
+
 public struct WorkspaceService: Sendable {
   private let git: Git
   private let toolPaths: ToolPaths
@@ -410,7 +427,7 @@ public struct WorkspaceService: Sendable {
     root: URL,
     deleteBranches: Bool,
     onUpdate: @escaping @Sendable (ProvisionUpdate) -> Void,
-    onPhase: @escaping @Sendable (String) -> Void = { _ in }
+    onPhase: @escaping @Sendable (WorkOutline) -> Void = { _ in }
   ) async throws {
     // Never delete outside the configured root, whatever the caller passes.
     let resolvedRoot = root.canonical.path
@@ -424,15 +441,24 @@ public struct WorkspaceService: Sendable {
       onUpdate(ProvisionUpdate(repo: member.repoName, state: .pending, detail: "Waiting"))
     }
 
+    // One step per repo, plus the folder at the end.
+    let steps = Double(workspace.members.count + 1)
     for (index, member) in workspace.members.enumerated() {
-      onPhase("Removing \(member.repoName) — \(index + 1) of \(workspace.members.count)")
+      onPhase(
+        WorkOutline(
+          label: "Removing \(member.repoName) — \(index + 1) of \(workspace.members.count)",
+          fraction: Double(index) / steps))
       await removeRepo(
         member, from: workspace, library: library, deleteBranch: deleteBranches, onUpdate: onUpdate)
     }
 
     if FileManager.default.fileExists(atPath: workspace.url.path) {
-      onPhase("Removing the workspace folder")
+      onPhase(
+        WorkOutline(
+          label: "Removing the workspace folder",
+          fraction: Double(workspace.members.count) / steps))
       try FileManager.default.removeItem(at: workspace.url)
     }
+    onPhase(WorkOutline(label: "Removed \(workspace.name)", fraction: 1))
   }
 }

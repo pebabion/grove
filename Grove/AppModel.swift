@@ -18,8 +18,10 @@ final class AppModel {
   var selection: URL?
   var isScanning = false
   var isBusy = false
-  /// What the busy work is, for the footer to name.
+  /// What the busy work is, for the footer to name, and how far through it is when that
+  /// can be known. A bar that cannot say how far along it is has nothing to draw.
   var busyLabel: String?
+  var busyFraction: Double?
   var errorMessage: String?
 
   /// False when the library file exists but could not be decoded.
@@ -536,6 +538,7 @@ final class AppModel {
     defer {
       isBusy = false
       busyLabel = nil
+      busyFraction = nil
     }
 
     do {
@@ -664,6 +667,7 @@ final class AppModel {
     defer {
       isBusy = false
       busyLabel = nil
+      busyFraction = nil
     }
     do {
       terminals.closeAll(under: workspace.url)
@@ -676,8 +680,11 @@ final class AppModel {
         root: library.workspaceRootURL,
         deleteBranches: deleteBranches,
         onUpdate: handler(forWorkspaceAt: workspace.url),
-        onPhase: { phase in
-          Task { @MainActor [weak self] in self?.busyLabel = phase }
+        onPhase: { outline in
+          Task { @MainActor [weak self] in
+            self?.busyLabel = outline.label
+            self?.busyFraction = outline.fraction
+          }
         }
       )
       // Update the list before rescanning. A rescan runs git in every remaining

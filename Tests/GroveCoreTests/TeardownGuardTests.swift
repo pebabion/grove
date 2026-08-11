@@ -124,7 +124,7 @@ struct TeardownProgressTests {
 
   /// A workspace of two repos, and everything it said on the way out.
   private func removalReport(deleteBranches: Bool) async throws -> (
-    steps: [String], phases: [String], repos: [String]
+    steps: [String], phases: [String], repos: [String], fractions: [Double]
   ) {
     let sandbox = try Sandbox()
     let root = sandbox.root.appending(path: "spaces")
@@ -158,7 +158,7 @@ struct TeardownProgressTests {
       onUpdate: { steps.add(update: $0) }, onPhase: { steps.add(phase: $0) })
 
     withExtendedLifetime(sandbox) {}
-    return (steps.details, steps.phases, steps.repos)
+    return (steps.details, steps.phases, steps.repos, steps.fractions)
   }
 
   /// Collects what arrives from another task without racing.
@@ -166,6 +166,7 @@ struct TeardownProgressTests {
     private let lock = NSLock()
     private var _details: [String] = []
     private var _phases: [String] = []
+    private var _fractions: [Double] = []
     private var _repos: [String] = []
 
     func add(update: ProvisionUpdate) {
@@ -174,10 +175,16 @@ struct TeardownProgressTests {
         _repos.append(update.repo)
       }
     }
-    func add(phase: String) { lock.withLock { _phases.append(phase) } }
+    func add(phase: WorkOutline) {
+      lock.withLock {
+        _phases.append(phase.label)
+        _fractions.append(phase.fraction)
+      }
+    }
 
     var details: [String] { lock.withLock { _details } }
     var phases: [String] { lock.withLock { _phases } }
+    var fractions: [Double] { lock.withLock { _fractions } }
     var repos: [String] { lock.withLock { _repos } }
   }
 
@@ -212,12 +219,26 @@ struct TeardownProgressTests {
     let report = try await removalReport(deleteBranches: false)
     #expect(report.phases.contains("Removing backend — 1 of 2"))
     #expect(report.phases.contains("Removing frontend — 2 of 2"))
-    #expect(report.phases.last == "Removing the workspace folder")
+    #expect(report.phases.contains("Removing the workspace folder"))
+    // The last word is that it is done, which is what takes the bar to the end.
+    #expect(report.phases.last == "Removed doomed")
   }
 
   @Test("every repo is accounted for")
   func everyRepoReports() async throws {
     let report = try await removalReport(deleteBranches: false)
     #expect(Set(report.repos) == ["backend", "frontend"])
+  }
+}
+
+extension TeardownProgressTests {
+  @Test("progress only ever moves forward, and finishes at the end")
+  func progressIsHonest() async throws {
+    // A bar that goes backwards, or stops short of the end, is worse than no bar.
+    let report = try await removalReport(deleteBranches: false)
+    #expect(report.fractions == report.fractions.sorted())
+    #expect(report.fractions.first == 0)
+    #expect(report.fractions.last == 1)
+    #expect(report.fractions.allSatisfy { $0 >= 0 && $0 <= 1 })
   }
 }
