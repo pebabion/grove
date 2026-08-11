@@ -29,10 +29,10 @@ struct ShortcutGuide: View {
       title: "Workspaces",
       shortcuts: [
         Shortcut(keys: "⌘ N", what: "New workspace"),
-        Shortcut(keys: "⌘ ⇧ [ / ]", what: "Previous or next workspace"),
+        Shortcut(keys: "⌘ ⇧ [ / ]", what: "Previous or next"),
         Shortcut(keys: "⌘ R", what: "Rescan from disk"),
         Shortcut(keys: "⌘ ⇧ E", what: "Open in your editor"),
-        Shortcut(keys: "⌘ ⇧ ⌫", what: "Remove this workspace"),
+        Shortcut(keys: "⌘ ⇧ ⌫", what: "Remove it"),
       ]),
     Group(
       title: "Terminal",
@@ -47,15 +47,17 @@ struct ShortcutGuide: View {
       shortcuts: [
         Shortcut(keys: "⌘ P", what: "Find a file"),
         Shortcut(keys: "⌘ F", what: "Search in this file"),
-        Shortcut(keys: "⌘ G", what: "Next match, ⇧ for previous"),
+        Shortcut(keys: "⌘ G", what: "Next match"),
+        Shortcut(keys: "⌘ ⇧ G", what: "Previous match"),
         Shortcut(keys: "⌘ E", what: "Open in your editor"),
       ]),
   ]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .center, spacing: 10) {
       Text("Shortcuts")
         .font(.headline)
+        .foregroundStyle(.secondary)
 
       HStack(alignment: .top, spacing: 24) {
         ForEach(groups) { group in
@@ -84,9 +86,12 @@ struct ShortcutGuide: View {
           .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
-      .padding(14)
+      .padding(16)
       .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+      // Held to the width the three columns actually need. Stretched across a wide
+      // window the pairs drift apart until a key and what it does stop looking related.
+      .frame(maxWidth: 720)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(maxWidth: .infinity, alignment: .center)
   }
 }
