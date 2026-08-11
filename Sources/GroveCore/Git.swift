@@ -210,6 +210,31 @@ public struct Git: Sendable {
   /// Every worktree of a repository shares one `.git` directory, and its parent
   /// is the original clone. This is how Grove maps a worktree it finds on disk
   /// back to a library entry — matching on directory names would guess wrong.
+  /// Where a worktree's git state lives, read from the `.git` file it carries.
+  ///
+  /// A worktree's `.git` is a file, not a directory: one line reading
+  /// `gitdir: /path/to/clone/.git/worktrees/<name>`. That directory is where `HEAD`
+  /// changes when a branch is switched, which is the cheapest place to watch for it.
+  /// Read rather than asked of git, because this runs for every worktree and spawning a
+  /// process each time to learn a path a file already holds is waste.
+  public static func gitDirectory(of worktree: URL) -> URL? {
+    let pointer = worktree.appending(path: ".git")
+    guard let contents = try? String(contentsOf: pointer, encoding: .utf8) else {
+      // A clone rather than a worktree: .git is the directory itself.
+      var isDirectory: ObjCBool = false
+      guard FileManager.default.fileExists(atPath: pointer.path, isDirectory: &isDirectory),
+        isDirectory.boolValue
+      else { return nil }
+      return pointer
+    }
+
+    let line = contents.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard line.hasPrefix("gitdir:") else { return nil }
+    let path = line.dropFirst("gitdir:".count).trimmingCharacters(in: .whitespaces)
+    guard !path.isEmpty else { return nil }
+    return URL(fileURLWithPath: path)
+  }
+
   public func sourceClone(of worktree: URL) async throws -> URL? {
     let result = try await attempt([
       "-C", worktree.path, "rev-parse", "--path-format=absolute", "--git-common-dir",

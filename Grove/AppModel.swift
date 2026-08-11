@@ -325,6 +325,10 @@ final class AppModel {
   }
 
   private let notifier = SessionNotifier()
+  private let disk = DiskWatcher()
+  /// When the list last caught up, so a change Grove made itself does not bounce back as
+  /// a change to react to.
+  private var lastScan = Date.distantPast
   let hookRelay = HookRelay()
 
   /// Directories that have delivered a hook event.
@@ -361,6 +365,7 @@ final class AppModel {
     }
     notifier.onOpen = { [weak self] id in self?.reveal(sessionID: id) }
     hookRelay.onEvent = { [weak self] event in self?.handle(event) }
+    disk.onChange = { [weak self] in self?.rescanFromDisk() }
 
     toolPaths = await ToolPaths.discover()
     loadLibrary()
@@ -395,6 +400,35 @@ final class AppModel {
     startUpdateChecks()
   }
 
+  /// Rescans because something on disk changed, unless something is already happening.
+  ///
+  /// Skipped while creating or removing: those write to the very directories being
+  /// watched, and they rescan themselves when they are done.
+  private func rescanFromDisk() {
+    guard !isBusy, !isScanning else { return }
+    guard Date().timeIntervalSince(lastScan) > 2 else { return }
+    Log.disk.note("something changed, rescanning")
+    Task { await rescan() }
+  }
+
+  /// Watches the places that change when the list should change.
+  ///
+  /// The root, where workspaces come and go, and each worktree's git directory, where a
+  /// branch switch or a commit lands. Not the worktrees themselves: an agent writing
+  /// files would have this rescanning continuously.
+  private func watchDisk() {
+    var directories = [library.workspaceRootURL]
+    for workspace in workspaces {
+      for member in workspace.members where member.state != .pending {
+        if let gitDirectory = Git.gitDirectory(of: member.url) {
+          directories.append(gitDirectory)
+        }
+      }
+    }
+    Log.disk.note("watching \(directories.count) directories")
+    disk.watch(directories)
+  }
+
   func rescan() async {
     guard let git else {
       errorMessage = "Could not find git. Set its path in Settings."
@@ -409,6 +443,12 @@ final class AppModel {
       selection = workspaces.first?.url
     }
     isScanning = false
+    lastScan = Date()
+    // The set of things worth watching changes with the set of workspaces.
+    watchDisk()
+    // A workspace that has just appeared should not wait for the next half-hourly sweep
+    // to say how big it is. Only the ones with no reading are walked.
+    Task { await measureStale() }
 
     // A branch can add or drop a skill without Grove doing anything, and a rescan is
     // where Grove makes itself match the disk.
@@ -973,10 +1013,6 @@ final class AppModel {
 
     sizes.prune(keeping: workspaces.map(\.url))
     try? store.save(sizes, to: SizeCache.fileURL)
-  }
-
-  func measureAll() async {
-    await measure(workspaces)
   }
 
   // MARK: - Opening things

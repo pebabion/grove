@@ -444,3 +444,20 @@ every line in it is a claim that has to be true.
 ⌘ + Backspace belongs to the terminal, where it deletes to the start of the line. A menu
 key equivalent would take it, because menus are offered a key before any view is, which is
 why removing a workspace is ⌘ + Shift + Backspace.
+
+## The list keeps itself current
+
+`DiskWatcher` watches the workspace root, where workspaces come and go, and each
+worktree's git directory, where a branch switch or a commit lands. A change settles for
+700ms and then rescans, with two seconds between scans so a run of commits does not mean
+a run of scans. A scan costs around 400ms for three workspaces — measured — which is fine
+on a change and far too expensive to poll.
+
+**Watch git directories, not worktrees.** An agent writing files would have this rescanning
+continuously. And watch the directory rather than `HEAD` itself: git writes `HEAD` by
+renaming a new file over the old one, leaving a file watch holding an inode nothing will
+touch again.
+
+There is no Rescan button, no ⌘ R and no "measure again": all of it happens on its own. A
+control for something that already happens is a thing to wonder about. If the list ever
+goes stale, the fault is in the watching and belongs there rather than behind a button.

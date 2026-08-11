@@ -173,3 +173,38 @@ final class Sandbox {
     try await git.run(["-C", worktree.path, "commit", "-m", message])
   }
 }
+
+@Suite("finding where a worktree keeps its git state", .serialized)
+struct GitDirectoryTests {
+  let git = Git()
+
+  @Test("reads the gitdir a worktree points at")
+  func readsWorktreePointer() async throws {
+    // This is where HEAD changes when a branch is switched, and watching it is how the
+    // list keeps up without anyone asking it to.
+    let sandbox = try Sandbox()
+    let repo = try await sandbox.makeRepository(named: "backend")
+    let worktree = sandbox.root.appending(path: "spaces/work/backend")
+    try await git.addWorktree(repo: repo, at: worktree, branch: "kelvin/work", base: "main")
+
+    let directory = try #require(Git.gitDirectory(of: worktree))
+    #expect(directory.path.contains("worktrees"))
+    #expect(FileManager.default.fileExists(atPath: directory.appending(path: "HEAD").path))
+    withExtendedLifetime(sandbox) {}
+  }
+
+  @Test("a clone points at its own .git directory")
+  func readsCloneDirectory() async throws {
+    let sandbox = try Sandbox()
+    let repo = try await sandbox.makeRepository(named: "backend")
+
+    let directory = try #require(Git.gitDirectory(of: repo))
+    #expect(directory.lastPathComponent == ".git")
+    withExtendedLifetime(sandbox) {}
+  }
+
+  @Test("somewhere that is not a repository has none")
+  func plainDirectory() throws {
+    #expect(Git.gitDirectory(of: URL(fileURLWithPath: NSTemporaryDirectory())) == nil)
+  }
+}

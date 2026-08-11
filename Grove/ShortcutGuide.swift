@@ -30,7 +30,6 @@ struct ShortcutGuide: View {
       shortcuts: [
         Shortcut(keys: "⌘ N", what: "New workspace"),
         Shortcut(keys: "⌘ ⇧ [ / ]", what: "Previous or next"),
-        Shortcut(keys: "⌘ R", what: "Rescan from disk"),
         Shortcut(keys: "⌘ ⇧ E", what: "Open in your editor"),
         Shortcut(keys: "⌘ ⇧ ⌫", what: "Remove it"),
       ]),

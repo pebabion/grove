@@ -15,6 +15,7 @@ import os
 enum Log {
   static let sessions = Category(name: "sessions")
   static let hooks = Category(name: "hooks")
+  static let disk = Category(name: "disk")
 
   struct Category {
     let name: String

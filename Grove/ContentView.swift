@@ -99,13 +99,6 @@ struct ContentView: View {
         .help(
           model.library.repos.isEmpty ? "Add a repo in Settings first" : "New workspace (⌘ + N)")
 
-        Button {
-          Task { await model.rescan() }
-        } label: {
-          Label("Rescan", systemImage: "arrow.clockwise")
-        }
-        .disabled(model.isScanning)
-        .help("Rescan every workspace (⌘ + R)")
       }
     }
     .safeAreaInset(edge: .bottom) {
@@ -159,30 +152,20 @@ struct ContentView: View {
     .foregroundStyle(.secondary)
   }
 
-  /// Either the measured total or an invitation to measure. Walking every file
-  /// takes tens of seconds, so it is a button rather than something that happens
-  /// by itself.
+  /// The measured total, or the root while the first measurement is still running.
+  ///
+  /// No button to start it: measuring happens on its own, when a reading is missing or has
+  /// gone stale. A control for something that already happens is a thing to wonder about.
   @ViewBuilder
   private var diskFooter: some View {
     let total = model.knownTotal
     if total.bytes > 0 {
-      Button {
-        Task { await model.measureAll() }
-      } label: {
-        Text(
-          total.complete
-            ? total.bytes.formatted(.byteCount(style: .file))
-            : "\(total.bytes.formatted(.byteCount(style: .file)))+ measured"
-        )
-      }
-      .buttonStyle(.borderless)
-      .help("Measure disk usage again")
-    } else if !model.workspaces.isEmpty {
-      Button("Measure disk usage") {
-        Task { await model.measureAll() }
-      }
-      .buttonStyle(.borderless)
-      .help("Walks every file, which takes a while")
+      Text(
+        total.complete
+          ? total.bytes.formatted(.byteCount(style: .file))
+          : "\(total.bytes.formatted(.byteCount(style: .file)))+"
+      )
+      .help(total.complete ? "Disk used by every workspace" : "Still measuring")
     } else {
       Text(model.library.workspaceRoot)
         .lineLimit(1)

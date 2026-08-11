@@ -30,9 +30,6 @@ struct GroveApp: App {
         .keyboardShortcut("j", modifiers: .command)
         .disabled(model.selection == nil)
 
-        Button("Rescan") { Task { await model.rescan() } }
-          .keyboardShortcut("r")
-
         Button(model.fileCommandTitle) {
           model.toggleFiles()
         }
