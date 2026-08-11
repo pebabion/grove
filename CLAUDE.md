@@ -341,6 +341,12 @@ horizontal scroller never appeared, and the right-hand end of every long line wa
 unreachable. Numbers count logical lines rather than the rows they occupy, so a wrapped
 line keeps one number.
 
+**On the line-number ruler, override only `drawHashMarksAndLabels`.** Overriding `draw`
+to paint the gutter background hid the file *and the header above it*, leaving a column of
+numbers beside an empty pane. The scroll view's background reaches the gutter on its own.
+Found by rendering the view offscreen into a PNG and looking at it, which is how any
+layout question here gets answered without a screenshot.
+
 The view is built from TextKit 1 pieces rather than `NSTextView.scrollableTextView()`,
 because the line-number ruler needs a layout manager and the modern stack does not hand
 one over without falling back anyway. Two things the ruler must survive: an empty file,

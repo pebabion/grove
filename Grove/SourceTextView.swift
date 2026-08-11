@@ -6,27 +6,20 @@ import SwiftUI
 /// Numbers count logical lines, not the rows they occupy: a wrapped line keeps one
 /// number, which is what makes them worth anything when comparing against an error
 /// message or a diff.
+///
+/// **Only `drawHashMarksAndLabels` may be overridden here.** Overriding `draw` to paint
+/// the gutter background hid the file, and the header above it, leaving a column of
+/// numbers beside an empty pane. The scroll view's own background colour reaches the
+/// gutter, so there is nothing to paint.
 final class LineNumberRuler: NSRulerView {
   /// Where each line begins, so the number for a position is a binary search rather
   /// than a count from the top of the file.
   private var lineStarts: [Int] = [0]
 
-  /// The colour behind the numbers. `NSRulerView` paints nothing of its own, so
-  /// without this the gutter is a pale strip beside a dark file.
-  var fill: NSColor = .textBackgroundColor {
-    didSet { needsDisplay = true }
-  }
-
   init(textView: NSTextView) {
     super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
     clientView = textView
     ruleThickness = 44
-  }
-
-  override func draw(_ dirtyRect: NSRect) {
-    fill.setFill()
-    dirtyRect.fill()
-    super.draw(dirtyRect)
   }
 
   required init(coder: NSCoder) { fatalError("not used") }
@@ -148,6 +141,7 @@ struct SourceTextView: NSViewRepresentable {
       width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
     let scroll = NSScrollView()
+    scroll.drawsBackground = true
     scroll.documentView = text
     scroll.hasVerticalScroller = true
     scroll.hasHorizontalScroller = false
@@ -168,7 +162,6 @@ struct SourceTextView: NSViewRepresentable {
     guard let text = scroll.documentView as? NSTextView else { return }
     text.backgroundColor = background
     scroll.backgroundColor = background
-    (scroll.verticalRulerView as? LineNumberRuler)?.fill = background
 
     guard text.attributedString() != content else { return }
     text.textStorage?.setAttributedString(content)
