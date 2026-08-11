@@ -36,10 +36,7 @@ struct ShortcutGuide: View {
     Group(
       title: "Terminal",
       shortcuts: [
-        Shortcut(keys: "⌘ J", what: "Show or hide it"),
-        Shortcut(keys: "⇧ ↩", what: "New line, no submit"),
-        Shortcut(keys: "⌘ ⌫", what: "Delete to line start"),
-        Shortcut(keys: "⌘ ← / →", what: "Start or end of line"),
+        Shortcut(keys: "⌘ J", what: "Show or hide it")
       ]),
     Group(
       title: "Files",
