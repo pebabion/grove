@@ -103,17 +103,29 @@ public struct Git: Sendable {
 
   /// Removes a worktree, falling back to deleting the directory and pruning
   /// when git refuses.
-  public func removeWorktree(repo: URL, at path: URL, force: Bool) async throws {
+  /// How a worktree came to be removed, so the caller can say which happened.
+  public enum WorktreeRemoval: Sendable, Equatable {
+    /// `git worktree remove` did it.
+    case byGit
+    /// Git refused, so the directory was deleted and the clone's record pruned.
+    case byHand
+  }
+
+  @discardableResult
+  public func removeWorktree(repo: URL, at path: URL, force: Bool) async throws
+    -> WorktreeRemoval
+  {
     var arguments = ["-C", repo.path, "worktree", "remove", path.path]
     if force { arguments.append("--force") }
 
     let result = try await attempt(arguments)
-    guard !result.succeeded else { return }
+    guard !result.succeeded else { return .byGit }
 
     if FileManager.default.fileExists(atPath: path.path) {
       try FileManager.default.removeItem(at: path)
     }
     _ = try await attempt(["-C", repo.path, "worktree", "prune"])
+    return .byHand
   }
 
   public func pruneWorktrees(repo: URL) async throws {

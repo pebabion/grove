@@ -661,17 +661,24 @@ final class AppModel {
     guard let git else { return }
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     isBusy = true
-    defer { isBusy = false }
+    defer {
+      isBusy = false
+      busyLabel = nil
+    }
     do {
       terminals.closeAll(under: workspace.url)
       terminalWorkspaces.remove(workspace.url)
       activeSessions.removeValue(forKey: workspace.url)
+      busyLabel = "Removing \(workspace.name)"
       try await service.teardown(
         workspace: workspace,
         library: library,
         root: library.workspaceRootURL,
         deleteBranches: deleteBranches,
-        onUpdate: handler(forWorkspaceAt: workspace.url)
+        onUpdate: handler(forWorkspaceAt: workspace.url),
+        onPhase: { phase in
+          Task { @MainActor [weak self] in self?.busyLabel = phase }
+        }
       )
       // Update the list before rescanning. A rescan runs git in every remaining
       // worktree and takes seconds; waiting for it would leave the deleted row

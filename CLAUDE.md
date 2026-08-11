@@ -63,6 +63,12 @@ shared by every worktree of it, so a stash outlives any worktree it was made in.
 Listing them showed a red nine-item warning about work that was never at risk.
 `Git.clonewideStashes` exists and is named to say so.
 
+A removal says what it is doing at each step, and `teardown` reports workspace-level
+progress through `onPhase` — which repo of how many, and the folder going at the end. This
+is the one operation here that destroys work, so someone watching it deserves to know
+which part is taking the time and what it touched: whether git removed the worktree or
+refused and the folder was deleted outright, and whether the branch was kept.
+
 Over-warning is a failure of its own. An alarm that fires on safe things teaches
 people to click through the one that matters, so every entry in the audit must be
 something that is genuinely gone afterwards.

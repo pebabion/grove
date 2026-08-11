@@ -341,7 +341,8 @@ public struct WorkspaceService: Sendable {
 
     if let repo, let hook = resolver.resolve(phase: .teardown, repo: repo, worktree: member.url) {
       onUpdate(
-        ProvisionUpdate(repo: member.repoName, state: .settingUp, detail: "Running teardown"))
+        ProvisionUpdate(
+          repo: member.repoName, state: .settingUp, detail: "Running the teardown hook"))
       let result = try? await hooks.run(
         hook, worktree: member.url, repo: repo, workspace: workspace.url,
         branch: member.branch ?? workspace.file.branch)
@@ -356,16 +357,32 @@ public struct WorkspaceService: Sendable {
       }
     }
 
-    onUpdate(ProvisionUpdate(repo: member.repoName, state: .settingUp, detail: "Removing worktree"))
+    // Each step says what it is doing rather than one line covering all of them.
+    // Removing a worktree is the one operation here that destroys work, so a person
+    // watching it deserves to know which part is taking the time and what it touched.
+    func report(_ detail: String) {
+      onUpdate(ProvisionUpdate(repo: member.repoName, state: .settingUp, detail: detail))
+    }
+
     if let repo {
-      try? await git.removeWorktree(repo: repo.url, at: member.url, force: true)
+      report("Removing the worktree")
+      let removal = try? await git.removeWorktree(repo: repo.url, at: member.url, force: true)
+      if removal == .byHand {
+        // Worth saying: git declined and the directory was deleted outright.
+        report("Git would not remove it, so the folder was deleted")
+      }
+
       if deleteBranch, let branch = member.branch {
+        report("Deleting the branch \(branch)")
         try? await git.deleteBranch(repo: repo.url, branch: branch, force: true)
       }
     } else if FileManager.default.fileExists(atPath: member.url.path) {
+      // No entry in the library, so there is no clone to ask: the folder is all there is.
+      report("Deleting the folder — this repo is not in the library")
       try? FileManager.default.removeItem(at: member.url)
     }
 
+    report("Updating the workspace file")
     let metadataURL = workspace.url.appending(path: GroveLocations.workspaceFileName)
     if var file = try? store.load(WorkspaceFile.self, from: metadataURL) {
       file.repos.removeAll { $0 == member.repoName }
@@ -373,18 +390,27 @@ public struct WorkspaceService: Sendable {
     }
 
     // The removed repo's skills went with its worktree, so its links are now dangling.
+    report("Relinking skills")
     linkSkills(in: workspace.url)
 
-    onUpdate(ProvisionUpdate(repo: member.repoName, state: .pending, detail: "Removed"))
+    onUpdate(
+      ProvisionUpdate(
+        repo: member.repoName, state: .pending,
+        detail: deleteBranch ? "Removed, with its branch" : "Removed, branch kept"))
   }
 
   /// Removes every worktree and then the workspace directory.
+  ///
+  /// `onPhase` reports what is happening to the workspace as a whole, which the per-repo
+  /// updates cannot: which repo of how many is being dealt with, and the folder itself
+  /// going at the end.
   public func teardown(
     workspace: Workspace,
     library: RepoLibrary,
     root: URL,
     deleteBranches: Bool,
-    onUpdate: @escaping @Sendable (ProvisionUpdate) -> Void
+    onUpdate: @escaping @Sendable (ProvisionUpdate) -> Void,
+    onPhase: @escaping @Sendable (String) -> Void = { _ in }
   ) async throws {
     // Never delete outside the configured root, whatever the caller passes.
     let resolvedRoot = root.canonical.path
@@ -393,12 +419,19 @@ public struct WorkspaceService: Sendable {
       throw WorkspaceError.notUnderWorkspaceRoot(resolved)
     }
 
+    // Everything queued says so, so a row that has not started yet does not look stuck.
     for member in workspace.members {
+      onUpdate(ProvisionUpdate(repo: member.repoName, state: .pending, detail: "Waiting"))
+    }
+
+    for (index, member) in workspace.members.enumerated() {
+      onPhase("Removing \(member.repoName) — \(index + 1) of \(workspace.members.count)")
       await removeRepo(
         member, from: workspace, library: library, deleteBranch: deleteBranches, onUpdate: onUpdate)
     }
 
     if FileManager.default.fileExists(atPath: workspace.url.path) {
+      onPhase("Removing the workspace folder")
       try FileManager.default.removeItem(at: workspace.url)
     }
   }

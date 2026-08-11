@@ -110,3 +110,114 @@ struct TeardownGuardTests {
     #expect(FileManager.default.fileExists(atPath: root.path))
   }
 }
+
+/// Removing a worktree is the one operation here that destroys work, so what it reports
+/// while it runs is part of the feature rather than decoration.
+@Suite("what a removal reports while it runs", .serialized)
+struct TeardownProgressTests {
+  let git = Git()
+  let toolPaths = ToolPaths(searchPaths: ["/usr/bin", "/bin", "/opt/homebrew/bin"])
+
+  private func service() -> WorkspaceService {
+    WorkspaceService(git: git, toolPaths: toolPaths)
+  }
+
+  /// A workspace of two repos, and everything it said on the way out.
+  private func removalReport(deleteBranches: Bool) async throws -> (
+    steps: [String], phases: [String], repos: [String]
+  ) {
+    let sandbox = try Sandbox()
+    let root = sandbox.root.appending(path: "spaces")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let backend = try await sandbox.makeRepository(named: "backend")
+    let frontend = try await sandbox.makeRepository(named: "frontend")
+    let library = RepoLibrary(
+      repos: [
+        RepoEntry(name: "backend", path: backend.path, base: "main"),
+        RepoEntry(name: "frontend", path: frontend.path, base: "main"),
+      ],
+      workspaceRoot: root.path)
+
+    let created = try await service().create(
+      name: "doomed", branch: "kelvin/doomed", link: nil, repos: library.repos,
+      in: root, onUpdate: { _ in })
+
+    let members = ["backend", "frontend"].map {
+      WorkspaceMember(
+        repoName: $0, url: created.appending(path: $0), branch: "kelvin/doomed", state: .ready)
+    }
+    let workspace = Workspace(
+      url: created,
+      file: WorkspaceFile(name: "doomed", branch: "kelvin/doomed", repos: ["backend", "frontend"]),
+      members: members)
+
+    let steps = Reporter()
+    try await service().teardown(
+      workspace: workspace, library: library, root: root, deleteBranches: deleteBranches,
+      onUpdate: { steps.add(update: $0) }, onPhase: { steps.add(phase: $0) })
+
+    withExtendedLifetime(sandbox) {}
+    return (steps.details, steps.phases, steps.repos)
+  }
+
+  /// Collects what arrives from another task without racing.
+  private final class Reporter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _details: [String] = []
+    private var _phases: [String] = []
+    private var _repos: [String] = []
+
+    func add(update: ProvisionUpdate) {
+      lock.withLock {
+        if let detail = update.detail { _details.append(detail) }
+        _repos.append(update.repo)
+      }
+    }
+    func add(phase: String) { lock.withLock { _phases.append(phase) } }
+
+    var details: [String] { lock.withLock { _details } }
+    var phases: [String] { lock.withLock { _phases } }
+    var repos: [String] { lock.withLock { _repos } }
+  }
+
+  @Test("names each step rather than covering them with one line")
+  func namesEachStep() async throws {
+    let report = try await removalReport(deleteBranches: false)
+    #expect(report.steps.contains("Removing the worktree"))
+    #expect(report.steps.contains("Updating the workspace file"))
+    #expect(report.steps.contains("Relinking skills"))
+  }
+
+  @Test("says whether the branch was kept")
+  func saysWhatHappenedToTheBranch() async throws {
+    let kept = try await removalReport(deleteBranches: false)
+    #expect(kept.steps.contains("Removed, branch kept"))
+    #expect(!kept.steps.contains { $0.hasPrefix("Deleting the branch") })
+
+    let deleted = try await removalReport(deleteBranches: true)
+    #expect(deleted.steps.contains("Deleting the branch kelvin/doomed"))
+    #expect(deleted.steps.contains("Removed, with its branch"))
+  }
+
+  @Test("a repo that has not started yet says it is waiting")
+  func queuedReposSayWaiting() async throws {
+    // Otherwise a row with a spinner and no words looks stuck rather than queued.
+    let report = try await removalReport(deleteBranches: false)
+    #expect(report.steps.filter { $0 == "Waiting" }.count == 2)
+  }
+
+  @Test("reports which repo of how many, and the folder at the end")
+  func reportsWorkspaceProgress() async throws {
+    let report = try await removalReport(deleteBranches: false)
+    #expect(report.phases.contains("Removing backend — 1 of 2"))
+    #expect(report.phases.contains("Removing frontend — 2 of 2"))
+    #expect(report.phases.last == "Removing the workspace folder")
+  }
+
+  @Test("every repo is accounted for")
+  func everyRepoReports() async throws {
+    let report = try await removalReport(deleteBranches: false)
+    #expect(Set(report.repos) == ["backend", "frontend"])
+  }
+}
