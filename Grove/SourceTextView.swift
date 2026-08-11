@@ -115,6 +115,18 @@ final class SourcePane: NSView {
     didSet { needsLayout = true }
   }
 
+  /// No size of its own, in either direction.
+  ///
+  /// A plain view reports a fitting size big enough for its subviews, and one of those is
+  /// a text view as tall as the whole file. SwiftUI hands a view its ideal height, so the
+  /// pane claimed the lot and squeezed the header above it out of existence. A scroll
+  /// view says "no opinion" for exactly this reason; this has to say it too.
+  override var intrinsicContentSize: NSSize {
+    NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+  }
+
+  override var fittingSize: NSSize { .zero }
+
   override func layout() {
     super.layout()
     gutter.frame = NSRect(x: 0, y: 0, width: gutterWidth, height: bounds.height)
@@ -260,6 +272,19 @@ struct SourceTextView: NSViewRepresentable {
       content.string,
       font: text.font ?? .monospacedSystemFont(ofSize: 11, weight: .regular))
     text.scroll(.zero)
+  }
+
+  /// Takes whatever space it is offered.
+  ///
+  /// Without this SwiftUI asks the view how big it wants to be, and a plain view answers
+  /// with something large enough for its subviews — one of which is a text view as tall as
+  /// the file. The pane then claimed the whole height and squeezed the header above it out
+  /// of existence. `intrinsicContentSize` and `fittingSize` are not consulted here; this
+  /// is the one SwiftUI asks.
+  func sizeThatFits(_ proposal: ProposedViewSize, nsView: SourcePane, context: Context)
+    -> CGSize?
+  {
+    proposal.replacingUnspecifiedDimensions(by: CGSize(width: 480, height: 320))
   }
 
   func makeCoordinator() -> Coordinator { Coordinator() }
