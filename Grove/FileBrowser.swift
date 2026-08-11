@@ -27,6 +27,8 @@ struct FileBrowser: View {
   /// Held rather than recomputed: highlighting is about a millisecond per kilobyte, and
   /// a computed property would redo it on every pass over the body.
   @State private var highlighted: HighlightedSource?
+  /// The file whose path was just copied, so the button can say so for a moment.
+  @State private var copied: FileMatch?
   @State private var isLoading = true
   @FocusState private var searchFocused: Bool
 
@@ -133,12 +135,37 @@ struct FileBrowser: View {
   private func header(for file: FileMatch) -> some View {
     HStack(spacing: 8) {
       FileTypeIcon(path: file.path, size: 13)
-      RepoSwatch(repo: file.repo, size: 7)
-      Text(file.path)
+
+      // The whole path is the button. A path is there to be taken somewhere else, and
+      // clicking the thing you want is quicker than finding the control that copies it.
+      Button {
+        copy(file)
+      } label: {
+        HStack(spacing: 5) {
+          // The repo by name rather than by colour: a colour has to be learnt, and this
+          // is the part that makes the path mean something from the workspace root.
+          Text(file.repo)
+            .foregroundStyle(.secondary)
+          Text(file.path)
+        }
         .font(.system(.caption, design: .monospaced))
         .lineLimit(1)
         .truncationMode(.head)
-        .textSelection(.enabled)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .help("Copy \(copyable(file))")
+
+      Button {
+        copy(file)
+      } label: {
+        Image(systemName: copied == file ? "checkmark" : "doc.on.doc")
+          .font(.caption)
+          .foregroundStyle(copied == file ? Color.green : .secondary)
+      }
+      .buttonStyle(.plain)
+      .help("Copy the path")
+
       Spacer()
       Button("Open in Editor") { model.openInEditor(url(of: file)) }
         .buttonStyle(.link)
@@ -146,6 +173,27 @@ struct FileBrowser: View {
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 7)
+  }
+
+  /// What gets copied: the path from the workspace root, repo and all.
+  ///
+  /// Not the absolute path, which is long and mostly noise, and not the repo-relative
+  /// one, which is ambiguous across a workspace's repos. This is what a shell or an
+  /// agent started in the workspace can open as it stands.
+  private func copyable(_ file: FileMatch) -> String {
+    "\(file.repo)/\(file.path)"
+  }
+
+  private func copy(_ file: FileMatch) {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(copyable(file), forType: .string)
+
+    copied = file
+    Task {
+      try? await Task.sleep(for: .seconds(2))
+      // Only clear it if nothing else has been copied since.
+      if copied == file { copied = nil }
+    }
   }
 
   @ViewBuilder
