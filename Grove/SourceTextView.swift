@@ -3,28 +3,35 @@ import SwiftUI
 
 /// Line numbers down the left of a text view.
 ///
-/// Numbers count logical lines, not the rows they occupy: a wrapped line keeps one
-/// number, which is what makes them worth anything when comparing against an error
-/// message or a diff.
+/// A plain view rather than an `NSRulerView`. The ruler paints its own background, a few
+/// shades off the file's, which leaves a seam down the gutter that reads as a deliberate
+/// line. Painting over it by overriding `draw` hid the file entirely, and through a layer
+/// the ruler covered it again. A view of its own has none of that, and the numbers still
+/// line up because they are measured from the text's own layout.
 ///
-/// **Only `drawHashMarksAndLabels` may be overridden here.** Overriding `draw` to paint
-/// the gutter background hid the file, and the header above it, leaving a column of
-/// numbers beside an empty pane. The scroll view's own background colour reaches the
-/// gutter, so there is nothing to paint.
-final class LineNumberRuler: NSRulerView {
-  /// Where each line begins, so the number for a position is a binary search rather
-  /// than a count from the top of the file.
-  private var lineStarts: [Int] = [0]
+/// Numbers count logical lines, not the rows they occupy: a wrapped line keeps one
+/// number, which is what makes them worth anything beside an error message or a diff.
+final class GutterView: NSView {
+  weak var textView: NSTextView?
+  weak var clip: NSClipView?
 
-  init(textView: NSTextView) {
-    super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
-    clientView = textView
-    ruleThickness = 44
+  var fill: NSColor = .textBackgroundColor {
+    didSet { needsDisplay = true }
   }
 
-  required init(coder: NSCoder) { fatalError("not used") }
+  /// Where each line begins, so the number for a position is a binary search rather than
+  /// a count from the top of the file.
+  private var lineStarts: [Int] = [0]
 
-  func measure(_ text: String) {
+  /// Numbers are drawn top-down, like the text.
+  override var isFlipped: Bool { true }
+
+  private static let rightPadding: CGFloat = 10
+  private static let leftPadding: CGFloat = 10
+
+  /// Takes the text's line positions and reports how wide the gutter has to be for the
+  /// longest number it will show.
+  func measure(_ text: String, font: NSFont) -> CGFloat {
     var starts = [0]
     var index = 0
     for byte in text.utf8 {
@@ -32,38 +39,39 @@ final class LineNumberRuler: NSRulerView {
       if byte == 0x0A { starts.append(index) }
     }
     lineStarts = starts
-    // Room for the widest number plus breathing space, so a long file does not clip.
-    ruleThickness = max(30, CGFloat(String(starts.count).count) * 7.5 + 14)
     needsDisplay = true
+
+    let widest = "\(max(starts.count, 1))" as NSString
+    let size = widest.size(withAttributes: [.font: Self.numbering(font)])
+    return (size.width + Self.leftPadding + Self.rightPadding).rounded(.up)
   }
 
-  override func drawHashMarksAndLabels(in rect: NSRect) {
-    guard let textView = clientView as? NSTextView,
-      let layout = textView.layoutManager,
-      let container = textView.textContainer
+  /// A size below the text's, so the numbers stay out of the way of the code.
+  private static func numbering(_ font: NSFont) -> NSFont {
+    .monospacedDigitSystemFont(ofSize: max(9, font.pointSize - 1), weight: .regular)
+  }
+
+  override func draw(_ dirtyRect: NSRect) {
+    fill.setFill()
+    dirtyRect.fill()
+
+    guard let textView, let layout = textView.layoutManager,
+      let container = textView.textContainer, let clip
     else { return }
 
-    let visible = scrollView?.contentView.bounds ?? .zero
-    let inset = textView.textContainerInset.height
     let text = textView.string as NSString
+    guard text.length > 0 else { return }
+
+    let visible = clip.bounds
+    let inset = textView.textContainerInset.height
+    let base = textView.font ?? .monospacedSystemFont(ofSize: 11, weight: .regular)
+    let attributes: [NSAttributedString.Key: Any] = [
+      .font: Self.numbering(base),
+      .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.5),
+    ]
 
     let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
     let characters = layout.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
-
-    let font =
-      (textView.font ?? .monospacedSystemFont(ofSize: 11, weight: .regular))
-      .withSize((textView.font?.pointSize ?? 11) - 1)
-    let attributes: [NSAttributedString.Key: Any] = [
-      .font: font,
-      .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.55),
-    ]
-
-    // An empty file still has a first line, and asking the layout manager about a
-    // glyph it does not have is not a question it answers politely.
-    guard text.length > 0 else {
-      draw(number: 1, at: inset, attributes: attributes)
-      return
-    }
 
     var index = characters.location
     var line = self.line(containing: index)
@@ -73,22 +81,18 @@ final class LineNumberRuler: NSRulerView {
       let glyph = layout.glyphIndexForCharacter(at: lineRange.location)
       let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
 
-      draw(
-        number: line + 1,
-        at: fragment.minY + inset - visible.minY + (fragment.height - 14) / 2,
-        attributes: attributes)
+      let number = "\(line + 1)" as NSString
+      let size = number.size(withAttributes: attributes)
+      number.draw(
+        at: NSPoint(
+          x: bounds.width - size.width - Self.rightPadding,
+          y: fragment.minY + inset - visible.minY + (fragment.height - size.height) / 2),
+        withAttributes: attributes)
 
       line += 1
       guard lineRange.length > 0 else { break }
       index = NSMaxRange(lineRange)
     }
-  }
-
-  private func draw(number: Int, at y: CGFloat, attributes: [NSAttributedString.Key: Any]) {
-    let text = "\(number)" as NSString
-    let size = text.size(withAttributes: attributes)
-    text.draw(
-      at: NSPoint(x: ruleThickness - size.width - 8, y: y), withAttributes: attributes)
   }
 
   private func line(containing position: Int) -> Int {
@@ -102,15 +106,32 @@ final class LineNumberRuler: NSRulerView {
   }
 }
 
+/// The gutter and the text side by side, the gutter as wide as its widest number.
+final class SourcePane: NSView {
+  let gutter = GutterView()
+  let scroll = NSScrollView()
+
+  var gutterWidth: CGFloat = 40 {
+    didSet { needsLayout = true }
+  }
+
+  override func layout() {
+    super.layout()
+    gutter.frame = NSRect(x: 0, y: 0, width: gutterWidth, height: bounds.height)
+    scroll.frame = NSRect(
+      x: gutterWidth, y: 0, width: max(0, bounds.width - gutterWidth), height: bounds.height)
+  }
+}
+
 /// A text view that answers ⌘ + F.
 ///
 /// `NSTextView` has a find bar already; what it lacks is a way to be asked for it. The
-/// menu route only works when the text view holds focus, and here focus is usually in
-/// the search field or the file list, so the shortcut is caught directly.
+/// menu route only works when the text view holds focus, and here focus is usually in the
+/// search field or the file list, so the shortcut is caught directly.
 final class FindableTextView: NSTextView {
-  /// ⌘ + F and ⌘ + G only. ⌘ + E would be the usual "use the selection" shortcut, but
-  /// the header above this view already opens the file in an editor with it, and that
-  /// is worth more here than a second way to fill in the search field.
+  /// ⌘ + F and ⌘ + G only. ⌘ + E would be the usual "use the selection" shortcut, but the
+  /// header above this view already opens the file in an editor with it, and that is worth
+  /// more here than a second way to fill in the search field.
   private static let find: [String: NSTextFinder.Action] = [
     "f": .showFindInterface,
     "g": .nextMatch,
@@ -144,19 +165,19 @@ final class FindableTextView: NSTextView {
 
 /// Read-only text view holding an already-coloured string.
 ///
-/// AppKit rather than SwiftUI's `Text`: a `Text` holding a few thousand attributed
-/// lines lays out every one of them on every pass, and a source file is exactly that.
+/// AppKit rather than SwiftUI's `Text`: a `Text` holding a few thousand attributed lines
+/// lays out every one of them on every pass, and a source file is exactly that.
 /// `NSTextView` also brings the things reading needs anyway — selection, copy, find.
 ///
-/// Built from its TextKit 1 pieces rather than `NSTextView.scrollableTextView()`,
-/// because the ruler needs a layout manager and the modern stack does not hand one over
-/// without falling back anyway.
+/// Built from its TextKit 1 pieces rather than `NSTextView.scrollableTextView()`, because
+/// the gutter needs a layout manager and the modern stack does not hand one over without
+/// falling back anyway.
 struct SourceTextView: NSViewRepresentable {
   let content: NSAttributedString
   let background: NSColor
   let wraps: Bool
 
-  func makeNSView(context: Context) -> NSScrollView {
+  func makeNSView(context: Context) -> SourcePane {
     let storage = NSTextStorage()
     let layout = NSLayoutManager()
     storage.addLayoutManager(layout)
@@ -167,42 +188,42 @@ struct SourceTextView: NSViewRepresentable {
 
     let text = FindableTextView(frame: .zero, textContainer: container)
     text.isEditable = false
+    text.isSelectable = true
+    text.isRichText = false
     // The bar that slides in above the text, rather than the floating panel.
     text.usesFindBar = true
     text.isIncrementalSearchingEnabled = true
-    text.isSelectable = true
-    text.isRichText = false
     text.drawsBackground = true
-    text.textContainerInset = NSSize(width: 10, height: 8)
+    text.textContainerInset = NSSize(width: 6, height: 8)
     text.isVerticallyResizable = true
     text.minSize = NSSize(width: 0, height: 0)
     text.maxSize = NSSize(
       width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
-    let scroll = NSScrollView()
-    scroll.drawsBackground = true
-    scroll.documentView = text
-    scroll.hasVerticalScroller = true
-    scroll.autohidesScrollers = true
-    Self.apply(wraps: wraps, to: text, in: scroll)
+    let pane = SourcePane()
+    pane.scroll.drawsBackground = true
+    pane.scroll.documentView = text
+    pane.scroll.hasVerticalScroller = true
+    pane.scroll.autohidesScrollers = true
+    pane.addSubview(pane.gutter)
+    pane.addSubview(pane.scroll)
 
-    let ruler = LineNumberRuler(textView: text)
-    scroll.verticalRulerView = ruler
-    scroll.hasVerticalRuler = true
-    scroll.rulersVisible = true
+    pane.gutter.textView = text
+    pane.gutter.clip = pane.scroll.contentView
+    Self.apply(wraps: wraps, to: text, in: pane.scroll)
 
-    // The ruler draws only what is on screen, so it has to be told when that changes.
-    scroll.contentView.postsBoundsChangedNotifications = true
-    context.coordinator.observe(scroll: scroll, ruler: ruler)
-    return scroll
+    // The gutter draws only what is on screen, so it has to be told when that changes.
+    pane.scroll.contentView.postsBoundsChangedNotifications = true
+    context.coordinator.observe(pane: pane)
+    return pane
   }
 
   /// Wrapping, or a line that runs on and a scroller to follow it.
   ///
   /// Both halves matter: with `widthTracksTextView` off, the container must also be given
-  /// an unbounded width and the text view must be allowed to grow, or the line is laid
-  /// out beyond a view that never widens and cannot be scrolled to. That combination is
-  /// what left long lines unreachable the first time.
+  /// an unbounded width and the text view must be allowed to grow, or the line is laid out
+  /// beyond a view that never widens and cannot be scrolled to. That combination is what
+  /// left long lines unreachable the first time.
   static func apply(wraps: Bool, to text: NSTextView, in scroll: NSScrollView) {
     guard let container = text.textContainer else { return }
 
@@ -222,17 +243,22 @@ struct SourceTextView: NSViewRepresentable {
     scroll.hasHorizontalScroller = !wraps
   }
 
-  func updateNSView(_ scroll: NSScrollView, context: Context) {
-    guard let text = scroll.documentView as? NSTextView else { return }
+  func updateNSView(_ pane: SourcePane, context: Context) {
+    guard let text = pane.scroll.documentView as? NSTextView else { return }
     text.backgroundColor = background
-    scroll.backgroundColor = background
+    pane.scroll.backgroundColor = background
+    // The same colour as the file, so there is no seam between them.
+    pane.gutter.fill = background
+
     if (text.textContainer?.widthTracksTextView ?? true) != wraps {
-      Self.apply(wraps: wraps, to: text, in: scroll)
+      Self.apply(wraps: wraps, to: text, in: pane.scroll)
     }
 
     guard text.attributedString() != content else { return }
     text.textStorage?.setAttributedString(content)
-    (scroll.verticalRulerView as? LineNumberRuler)?.measure(content.string)
+    pane.gutterWidth = pane.gutter.measure(
+      content.string,
+      font: text.font ?? .monospacedSystemFont(ofSize: 11, weight: .regular))
     text.scroll(.zero)
   }
 
@@ -241,18 +267,18 @@ struct SourceTextView: NSViewRepresentable {
   final class Coordinator {
     private var observer: NSObjectProtocol?
 
-    /// Main-actor because it touches the scroll view's own views. It is only ever
-    /// called from `makeNSView`, which is on the main actor already — but saying so is
-    /// what lets an older compiler agree. This built locally on Xcode 26 and failed CI
-    /// on Xcode 16 without it.
+    /// Main-actor because it touches the scroll view's own views. It is only ever called
+    /// from `makeNSView`, which is on the main actor already — but saying so is what lets
+    /// an older compiler agree. This built locally on Xcode 26 and failed CI on Xcode 16
+    /// without it.
     @MainActor
-    func observe(scroll: NSScrollView, ruler: LineNumberRuler) {
+    func observe(pane: SourcePane) {
       observer = NotificationCenter.default.addObserver(
         forName: NSView.boundsDidChangeNotification,
-        object: scroll.contentView,
+        object: pane.scroll.contentView,
         queue: .main
-      ) { [weak ruler] _ in
-        MainActor.assumeIsolated { ruler?.needsDisplay = true }
+      ) { [weak pane] _ in
+        MainActor.assumeIsolated { pane?.gutter.needsDisplay = true }
       }
     }
 

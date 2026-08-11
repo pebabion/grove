@@ -350,11 +350,16 @@ clip view and the scroller appears; with it on the two match.
 The paragraph style lives inside the attributed text, so changing the mode re-reads and
 re-colours the file rather than just reconfiguring the view.
 
-**On the line-number ruler, override only `drawHashMarksAndLabels`.** Overriding `draw`
-to paint the gutter background hid the file *and the header above it*, leaving a column of
-numbers beside an empty pane. The scroll view's background reaches the gutter on its own.
-Found by rendering the view offscreen into a PNG and looking at it, which is how any
-layout question here gets answered without a screenshot.
+**The gutter is a plain `NSView`, not an `NSRulerView`.** The ruler cost two bugs: painting
+its background by overriding `draw` hid the file and the header above it, and leaving it
+alone left a seam down the gutter, because a ruler paints its own colour a few shades off
+the file's and covers anything put behind it. A view of its own paints what it is told and
+the numbers still align, since they are measured from the text's layout either way.
+
+**Measure a screenshot before believing a description of it.** "The text overlaps the line"
+turned out to be a 16-pixel-tall digit next to the gutter's edge, with 10 points of clear
+space around it — the real fault was the seam, not any overlap. Convert with `sips -s
+format bmp` and read the pixels; a Retina crop is 2x, which is easy to misjudge by eye.
 
 The view is built from TextKit 1 pieces rather than `NSTextView.scrollableTextView()`,
 because the line-number ruler needs a layout manager and the modern stack does not hand
