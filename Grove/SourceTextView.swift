@@ -102,6 +102,46 @@ final class LineNumberRuler: NSRulerView {
   }
 }
 
+/// A text view that answers ⌘ + F.
+///
+/// `NSTextView` has a find bar already; what it lacks is a way to be asked for it. The
+/// menu route only works when the text view holds focus, and here focus is usually in
+/// the search field or the file list, so the shortcut is caught directly.
+final class FindableTextView: NSTextView {
+  /// ⌘ + F and ⌘ + G only. ⌘ + E would be the usual "use the selection" shortcut, but
+  /// the header above this view already opens the file in an editor with it, and that
+  /// is worth more here than a second way to fill in the search field.
+  private static let find: [String: NSTextFinder.Action] = [
+    "f": .showFindInterface,
+    "g": .nextMatch,
+  ]
+
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    guard let key = event.charactersIgnoringModifiers?.lowercased() else {
+      return super.performKeyEquivalent(with: event)
+    }
+
+    if flags == [.command, .shift], key == "g" {
+      perform(.previousMatch)
+      return true
+    }
+    if flags == .command, let action = Self.find[key] {
+      perform(action)
+      return true
+    }
+    return super.performKeyEquivalent(with: event)
+  }
+
+  /// The find actions are asked for through a menu item's tag, so one is made to ask
+  /// with. There is no other way in.
+  private func perform(_ action: NSTextFinder.Action) {
+    let request = NSMenuItem()
+    request.tag = action.rawValue
+    performTextFinderAction(request)
+  }
+}
+
 /// Read-only text view holding an already-coloured string.
 ///
 /// AppKit rather than SwiftUI's `Text`: a `Text` holding a few thousand attributed
@@ -127,8 +167,11 @@ struct SourceTextView: NSViewRepresentable {
     container.widthTracksTextView = true
     layout.addTextContainer(container)
 
-    let text = NSTextView(frame: .zero, textContainer: container)
+    let text = FindableTextView(frame: .zero, textContainer: container)
     text.isEditable = false
+    // The bar that slides in above the text, rather than the floating panel.
+    text.usesFindBar = true
+    text.isIncrementalSearchingEnabled = true
     text.isSelectable = true
     text.isRichText = false
     text.drawsBackground = true

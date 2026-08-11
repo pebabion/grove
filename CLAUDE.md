@@ -353,6 +353,13 @@ one over without falling back anyway. Two things the ruler must survive: an empt
 and the position just past the last character — asking a layout manager about a glyph it
 does not have is not a question it answers politely.
 
+⌘ + F searches inside the open file, ⌘ + G and ⇧ ⌘ + G step through the matches.
+`NSTextView` already has the find bar; what it lacks is a way to be asked for it, since
+the menu route only reaches a text view that holds focus and here focus is usually in the
+search field or the file list. The shortcut is caught in `performKeyEquivalent` and the
+action passed through a menu item's tag, which is the only way in. Not ⌘ + E, the usual
+"use the selection" shortcut: the header above already opens the file in an editor with it.
+
 Read-only, deliberately. Agents rewrite these files while they are on screen, so
 anything that could save would need to know what changed underneath it, and Grove
 already opens a real editor in one click.
