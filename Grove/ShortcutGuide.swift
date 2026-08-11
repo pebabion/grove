@@ -38,6 +38,7 @@ struct ShortcutGuide: View {
       shortcuts: [
         Shortcut(keys: "⌘ J", what: "Show or hide it"),
         Shortcut(keys: "⌘ T", what: "Another session"),
+        Shortcut(keys: "⌘ W", what: "Close this session"),
       ]),
     Group(
       title: "Files",

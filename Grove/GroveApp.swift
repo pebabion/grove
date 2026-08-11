@@ -23,6 +23,13 @@ struct GroveApp: App {
         }
         .keyboardShortcut("n")
       }
+      // In the File menu, before the standard Close: whichever ⌘ + W item is found first
+      // takes the key, so this has to come first, and it has to be enabled always.
+      CommandGroup(after: .newItem) {
+        Button(model.closeCommandTitle) { model.closeSessionOrWindow() }
+          .keyboardShortcut("w")
+      }
+
       CommandGroup(after: .toolbar) {
         Button(model.terminalCommandTitle) {
           model.toggleTerminal()

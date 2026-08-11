@@ -283,6 +283,32 @@ final class AppModel {
     }
   }
 
+  /// What ⌘ + W will do next, for the menu item to say.
+  var closeCommandTitle: String { closableSession == nil ? "Close Window" : "Close Session" }
+
+  /// The session ⌘ + W would end: the one on screen, when nothing is covering it.
+  private var closableSession: TerminalSession? {
+    guard renameTarget == nil, teardownTarget == nil else { return nil }
+    guard let workspace = selectedWorkspace, terminalWorkspaces.contains(workspace.url) else {
+      return nil
+    }
+    return activeSession(in: workspace)
+  }
+
+  /// Ends the session on screen, or closes the window when there is none.
+  ///
+  /// One command rather than two, because two menu items cannot share ⌘ + W: the first
+  /// one found takes the key whether it is enabled or not, and a disabled one swallows it
+  /// and does nothing. Measured, after nearly shipping a version where ⌘ + W stopped
+  /// closing the window.
+  func closeSessionOrWindow() {
+    guard let session = closableSession else {
+      NSApp.keyWindow?.performClose(nil)
+      return
+    }
+    terminals.close(id: session.id)
+  }
+
   /// Starts another session, beside the one already running.
   ///
   /// In the directory the current session is in rather than the workspace root, which is
