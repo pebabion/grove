@@ -67,7 +67,7 @@ public struct FileIcon: Sendable, Hashable {
   /// what it compiles to.
   private static let symbols: [String: String] = [
     "bash": "terminal",
-    "markdown": "doc.richtext",
+    "markdown": "doc.text",
     "json": "curlybraces",
     "yaml": "list.bullet.rectangle",
     "ini": "slider.horizontal.3",
@@ -92,7 +92,7 @@ public struct FileIcon: Sendable, Hashable {
     "gif": FileIcon(symbol: "photo", colour: nil),
     "svg": FileIcon(symbol: "photo", colour: "#E37933"),
     "ico": FileIcon(symbol: "photo", colour: nil),
-    "pdf": FileIcon(symbol: "doc.richtext", colour: nil),
+    "pdf": FileIcon(symbol: "doc.richtext", colour: nil),  // the one place a badge fits
     "zip": FileIcon(symbol: "archivebox", colour: nil),
     "gz": FileIcon(symbol: "archivebox", colour: nil),
     "tar": FileIcon(symbol: "archivebox", colour: nil),

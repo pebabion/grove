@@ -37,6 +37,15 @@ actor SourceHighlighter {
     highlightr?.setTheme(to: "atom-one-dark")
   }
 
+  /// Indents the rows a long line wraps onto, so a continuation cannot be mistaken for
+  /// a line of its own — the thing that makes wrapped code hard to read.
+  private static func wrapping(_ font: NSFont) -> NSParagraphStyle {
+    let style = NSMutableParagraphStyle()
+    style.headIndent = font.maximumAdvancement.width * 4
+    style.lineBreakMode = .byWordWrapping
+    return style
+  }
+
   /// Highlighted text, falling back to plain when the language is unknown or
   /// highlighting fails.
   ///
@@ -54,7 +63,11 @@ actor SourceHighlighter {
     func plain() -> HighlightedSource {
       HighlightedSource(
         text: NSAttributedString(
-          string: text, attributes: [.font: font, .foregroundColor: NSColor.labelColor]),
+          string: text,
+          attributes: [
+            .font: font, .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: Self.wrapping(font),
+          ]),
         background: background)
     }
 
@@ -66,8 +79,9 @@ actor SourceHighlighter {
     // Highlightr picks its own monospace font and size; the one from Settings is the one
     // the user chose.
     let restyled = NSMutableAttributedString(attributedString: coloured)
-    restyled.addAttribute(
-      .font, value: font, range: NSRange(location: 0, length: restyled.length))
+    let whole = NSRange(location: 0, length: restyled.length)
+    restyled.addAttribute(.font, value: font, range: whole)
+    restyled.addAttribute(.paragraphStyle, value: Self.wrapping(font), range: whole)
     return HighlightedSource(text: restyled, background: background)
   }
 }

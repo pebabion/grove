@@ -133,46 +133,60 @@ struct FileBrowser: View {
   }
 
   private func header(for file: FileMatch) -> some View {
-    HStack(spacing: 8) {
-      FileTypeIcon(path: file.path, size: 13)
-
-      // The whole path is the button. A path is there to be taken somewhere else, and
-      // clicking the thing you want is quicker than finding the control that copies it.
+    HStack(spacing: 10) {
+      // The name first and plainly, then everything above it dimmed. The eye wants the
+      // file; the path is where it lives, which is context rather than the headline.
       Button {
         copy(file)
       } label: {
-        HStack(spacing: 5) {
-          // The repo by name rather than by colour: a colour has to be learnt, and this
-          // is the part that makes the path mean something from the workspace root.
-          Text(file.repo)
-            .foregroundStyle(.secondary)
-          Text(file.path)
+        HStack(spacing: 6) {
+          FileTypeIcon(path: file.path, size: 12)
+          Text(file.name)
+            .fontWeight(.medium)
+          Text(parent(of: file))
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .truncationMode(.head)
         }
-        .font(.system(.caption, design: .monospaced))
-        .lineLimit(1)
-        .truncationMode(.head)
+        .font(.caption)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .help("Copy \(copyable(file))")
 
-      Button {
-        copy(file)
-      } label: {
-        Image(systemName: copied == file ? "checkmark" : "doc.on.doc")
+      Spacer(minLength: 12)
+
+      // The actions sit together on the right, at a fixed place, rather than drifting
+      // with the length of the path.
+      HStack(spacing: 12) {
+        Button {
+          copy(file)
+        } label: {
+          Label(
+            copied == file ? "Copied" : "Copy path",
+            systemImage: copied == file ? "checkmark" : "doc.on.doc"
+          )
+          .labelStyle(.iconOnly)
           .font(.caption)
           .foregroundStyle(copied == file ? Color.green : .secondary)
-      }
-      .buttonStyle(.plain)
-      .help("Copy the path")
+        }
+        .buttonStyle(.plain)
+        .help("Copy \(copyable(file))")
 
-      Spacer()
-      Button("Open in Editor") { model.openInEditor(url(of: file)) }
-        .buttonStyle(.link)
-        .keyboardShortcut("e")
+        Button("Open in Editor") { model.openInEditor(url(of: file)) }
+          .buttonStyle(.link)
+          .font(.caption)
+          .keyboardShortcut("e")
+      }
     }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 7)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+  }
+
+  /// The repo and directories above the file, as one dimmed trail.
+  private func parent(of file: FileMatch) -> String {
+    let directory = (file.path as NSString).deletingLastPathComponent
+    return directory.isEmpty ? file.repo : "\(file.repo)/\(directory)"
   }
 
   /// What gets copied: the path from the workspace root, repo and all.

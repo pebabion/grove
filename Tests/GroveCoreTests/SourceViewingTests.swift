@@ -314,7 +314,7 @@ struct FileIconTests {
   func distinctSymbols() {
     // A shell script, a note and a pile of configuration should not look alike.
     #expect(FileIcon.named(for: "scripts/setup.sh").symbol == "terminal")
-    #expect(FileIcon.named(for: "README.md").symbol == "doc.richtext")
+    #expect(FileIcon.named(for: "README.md").symbol == "doc.text")
     #expect(FileIcon.named(for: "package.json").symbol == "curlybraces")
     #expect(FileIcon.named(for: "deploy.yaml").symbol == "list.bullet.rectangle")
     #expect(FileIcon.named(for: "Dockerfile").symbol == "shippingbox")
@@ -347,6 +347,6 @@ struct FileIconTests {
   @Test("case does not matter")
   func caseInsensitive() {
     #expect(FileIcon.named(for: "SETUP.SH") == FileIcon.named(for: "setup.sh"))
-    #expect(FileIcon.named(for: "README.MD").symbol == "doc.richtext")
+    #expect(FileIcon.named(for: "README.MD").symbol == "doc.text")
   }
 }

@@ -33,7 +33,7 @@ final class LineNumberRuler: NSRulerView {
     }
     lineStarts = starts
     // Room for the widest number plus breathing space, so a long file does not clip.
-    ruleThickness = max(36, CGFloat(String(starts.count).count) * 8 + 20)
+    ruleThickness = max(30, CGFloat(String(starts.count).count) * 7.5 + 14)
     needsDisplay = true
   }
 
@@ -175,7 +175,7 @@ struct SourceTextView: NSViewRepresentable {
     text.isSelectable = true
     text.isRichText = false
     text.drawsBackground = true
-    text.textContainerInset = NSSize(width: 6, height: 8)
+    text.textContainerInset = NSSize(width: 10, height: 8)
     text.isVerticallyResizable = true
     text.isHorizontallyResizable = false
     text.autoresizingMask = [NSView.AutoresizingMask.width]
