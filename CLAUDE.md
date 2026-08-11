@@ -336,6 +336,17 @@ Files and the repo list want the same space, so opening one hides the other — 
 directions, or the disclosure row toggles something the files are covering and looks
 broken.
 
+Text wraps, and lines are numbered. Wrapping is not a preference here: it was off, the
+horizontal scroller never appeared, and the right-hand end of every long line was simply
+unreachable. Numbers count logical lines rather than the rows they occupy, so a wrapped
+line keeps one number.
+
+The view is built from TextKit 1 pieces rather than `NSTextView.scrollableTextView()`,
+because the line-number ruler needs a layout manager and the modern stack does not hand
+one over without falling back anyway. Two things the ruler must survive: an empty file,
+and the position just past the last character — asking a layout manager about a glyph it
+does not have is not a question it answers politely.
+
 Read-only, deliberately. Agents rewrite these files while they are on screen, so
 anything that could save would need to know what changed underneath it, and Grove
 already opens a real editor in one click.

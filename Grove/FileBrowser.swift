@@ -2,43 +2,6 @@ import AppKit
 import GroveCore
 import SwiftUI
 
-/// Read-only text view holding an already-coloured string.
-///
-/// AppKit rather than SwiftUI's `Text`: a `Text` holding a few thousand attributed
-/// lines lays out every one of them on every pass, and a source file is exactly that.
-/// `NSTextView` also brings the things reading needs anyway — selection, copy, find.
-struct SourceTextView: NSViewRepresentable {
-  let content: NSAttributedString
-  let background: NSColor
-
-  func makeNSView(context: Context) -> NSScrollView {
-    let scroll = NSTextView.scrollableTextView()
-    guard let text = scroll.documentView as? NSTextView else { return scroll }
-
-    text.isEditable = false
-    text.isSelectable = true
-    text.isRichText = false
-    text.drawsBackground = true
-    text.textContainerInset = NSSize(width: 8, height: 8)
-    // No wrapping: source is written in lines, and folding them makes code unreadable.
-    text.isHorizontallyResizable = true
-    text.textContainer?.widthTracksTextView = false
-    text.textContainer?.containerSize = NSSize(
-      width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-    scroll.hasHorizontalScroller = true
-    return scroll
-  }
-
-  func updateNSView(_ scroll: NSScrollView, context: Context) {
-    guard let text = scroll.documentView as? NSTextView else { return }
-    text.backgroundColor = background
-    scroll.backgroundColor = background
-    guard text.attributedString() != content else { return }
-    text.textStorage?.setAttributedString(content)
-    text.scroll(.zero)
-  }
-}
-
 /// Find a file in the workspace and read it, in the window rather than over it.
 ///
 /// Part of the detail pane, taking the place of the repo list, so the terminal stays
