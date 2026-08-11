@@ -36,7 +36,8 @@ struct ShortcutGuide: View {
     Group(
       title: "Terminal",
       shortcuts: [
-        Shortcut(keys: "⌘ J", what: "Show or hide it")
+        Shortcut(keys: "⌘ J", what: "Show or hide it"),
+        Shortcut(keys: "⌘ T", what: "Another session"),
       ]),
     Group(
       title: "Files",

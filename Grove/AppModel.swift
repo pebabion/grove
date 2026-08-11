@@ -283,6 +283,18 @@ final class AppModel {
     }
   }
 
+  /// Starts another session, beside the one already running.
+  ///
+  /// In the directory the current session is in rather than the workspace root, which is
+  /// what a second tab is usually for: the same place, a second thing running. Opens the
+  /// terminal first if it is closed, since a session nobody can see is not much use.
+  func newSession() {
+    guard let workspace = selectedWorkspace else { return }
+    terminalWorkspaces.insert(workspace.url)
+    let directory = activeSession(in: workspace)?.directory ?? workspace.url
+    startSession(in: workspace, at: directory)
+  }
+
   /// Shows the terminal, starts a session, or hides it — whichever comes next.
   ///
   /// On the model rather than the view so the menu can drive it whatever has focus,

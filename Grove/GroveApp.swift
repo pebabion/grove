@@ -30,6 +30,10 @@ struct GroveApp: App {
         .keyboardShortcut("j", modifiers: .command)
         .disabled(model.selection == nil)
 
+        Button("New Terminal Session") { model.newSession() }
+          .keyboardShortcut("t")
+          .disabled(model.selection == nil)
+
         Button(model.fileCommandTitle) {
           model.toggleFiles()
         }
