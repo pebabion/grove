@@ -2,6 +2,16 @@ import AppKit
 import GroveCore
 import SwiftUI
 
+/// What the reading pane is currently being asked for.
+///
+/// Both parts change what is displayed, so both have to restart the work: a different
+/// file obviously, and a change of wrapping because the paragraph style lives inside the
+/// attributed text.
+private struct TextRequest: Equatable {
+  let file: FileMatch
+  let wraps: Bool
+}
+
 /// Find a file in the workspace and read it, in the window rather than over it.
 ///
 /// Part of the detail pane, taking the place of the repo list, so the terminal stays
@@ -33,6 +43,9 @@ struct FileBrowser: View {
   @FocusState private var searchFocused: Bool
 
   private var matches: [FileMatch] { result?.matches ?? [] }
+
+  /// Wrapping is on unless it has been turned off.
+  private var wraps: Bool { model.library.wrapsSourceText ?? true }
 
   var body: some View {
     HSplitView {
@@ -119,7 +132,9 @@ struct FileBrowser: View {
         body(for: selection)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .task(id: selection) { await read(selection) }
+      // Re-read when wrapping changes too: the paragraph style is part of the text, so
+      // the colouring has to be redone to change it.
+      .task(id: TextRequest(file: selection, wraps: wraps)) { await read(selection) }
     } else {
       VStack(spacing: 6) {
         Text("Select a file")
@@ -159,6 +174,17 @@ struct FileBrowser: View {
       // The actions sit together on the right, at a fixed place, rather than drifting
       // with the length of the path.
       HStack(spacing: 12) {
+        Button {
+          model.library.wrapsSourceText = !wraps
+          model.saveLibrary()
+        } label: {
+          Image(systemName: wraps ? "text.alignleft" : "arrow.left.and.right")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(wraps ? "Stop wrapping long lines" : "Wrap long lines")
+
         Button {
           copy(file)
         } label: {
@@ -215,7 +241,8 @@ struct FileBrowser: View {
     switch contents {
     case .text:
       if let highlighted {
-        SourceTextView(content: highlighted.text, background: highlighted.background)
+        SourceTextView(
+          content: highlighted.text, background: highlighted.background, wraps: wraps)
       } else {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
@@ -297,7 +324,7 @@ struct FileBrowser: View {
     guard case .text(let text) = read else { return }
     let font = model.terminalFont
     let coloured = await SourceHighlighter.shared.highlight(
-      text, path: file.path, fontName: font.fontName, fontSize: font.pointSize)
+      text, path: file.path, fontName: font.fontName, fontSize: font.pointSize, wraps: wraps)
     guard !Task.isCancelled else { return }
     highlighted = coloured
   }

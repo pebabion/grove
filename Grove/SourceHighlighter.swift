@@ -39,8 +39,13 @@ actor SourceHighlighter {
 
   /// Indents the rows a long line wraps onto, so a continuation cannot be mistaken for
   /// a line of its own — the thing that makes wrapped code hard to read.
-  private static func wrapping(_ font: NSFont) -> NSParagraphStyle {
+  private static func paragraphs(_ font: NSFont, wraps: Bool) -> NSParagraphStyle {
     let style = NSMutableParagraphStyle()
+    guard wraps else {
+      // Nothing to indent and nothing to break: the line runs on and the view scrolls.
+      style.lineBreakMode = .byClipping
+      return style
+    }
     style.headIndent = font.maximumAdvancement.width * 4
     style.lineBreakMode = .byWordWrapping
     return style
@@ -52,9 +57,9 @@ actor SourceHighlighter {
   /// Never returns nothing: a file that cannot be coloured is still a file someone
   /// asked to read. The font is built here rather than applied afterwards, so a large
   /// file does not need a second pass over its attributes on the main actor.
-  func highlight(_ text: String, path: String, fontName: String, fontSize: CGFloat)
-    -> HighlightedSource
-  {
+  func highlight(
+    _ text: String, path: String, fontName: String, fontSize: CGFloat, wraps: Bool
+  ) -> HighlightedSource {
     let font =
       NSFont(name: fontName, size: fontSize)
       ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -66,7 +71,7 @@ actor SourceHighlighter {
           string: text,
           attributes: [
             .font: font, .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: Self.wrapping(font),
+            .paragraphStyle: Self.paragraphs(font, wraps: wraps),
           ]),
         background: background)
     }
@@ -81,7 +86,8 @@ actor SourceHighlighter {
     let restyled = NSMutableAttributedString(attributedString: coloured)
     let whole = NSRange(location: 0, length: restyled.length)
     restyled.addAttribute(.font, value: font, range: whole)
-    restyled.addAttribute(.paragraphStyle, value: Self.wrapping(font), range: whole)
+    restyled.addAttribute(
+      .paragraphStyle, value: Self.paragraphs(font, wraps: wraps), range: whole)
     return HighlightedSource(text: restyled, background: background)
   }
 }

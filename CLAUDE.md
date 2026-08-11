@@ -336,10 +336,19 @@ Files and the repo list want the same space, so opening one hides the other — 
 directions, or the disclosure row toggles something the files are covering and looks
 broken.
 
-Text wraps, and lines are numbered. Wrapping is not a preference here: it was off, the
-horizontal scroller never appeared, and the right-hand end of every long line was simply
-unreachable. Numbers count logical lines rather than the rows they occupy, so a wrapped
-line keeps one number.
+Text wraps by default, with a switch in the header to turn it off, and lines are numbered.
+Numbers count logical lines rather than the rows they occupy, so a wrapped line keeps one
+number.
+
+**Turning wrapping off takes three changes together, not one.** `widthTracksTextView` off,
+the container given an unbounded width, and the text view allowed to grow
+(`isHorizontallyResizable`). Miss any and the line is laid out past a view that never
+widens and cannot be scrolled to, which is how long lines were unreachable the first time.
+Verified by measuring: with wrapping off the document view grows to 3948pt inside a 600pt
+clip view and the scroller appears; with it on the two match.
+
+The paragraph style lives inside the attributed text, so changing the mode re-reads and
+re-colours the file rather than just reconfiguring the view.
 
 **On the line-number ruler, override only `drawHashMarksAndLabels`.** Overriding `draw`
 to paint the gutter background hid the file *and the header above it*, leaving a column of

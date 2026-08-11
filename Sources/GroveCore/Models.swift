@@ -111,6 +111,10 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// relay — follows it, because nobody wants to be asked about that separately.
   public var notifySessionEvents: Bool?
 
+  /// Whether the file viewer wraps long lines. On by default: with it off, reading the
+  /// end of a line means scrolling sideways.
+  public var wrapsSourceText: Bool?
+
   /// Whether programs in the terminal receive mouse events.
   ///
   /// Off by default, because it is what makes selecting text possible: SwiftTerm
@@ -136,6 +140,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalForeground: String? = nil,
     notifySessionEvents: Bool? = nil,
     terminalMouseReporting: Bool? = nil,
+    wrapsSourceText: Bool? = nil,
     toolOverrides: [String: String] = [:]
   ) {
     self.repos = repos
@@ -149,6 +154,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.terminalForeground = terminalForeground
     self.notifySessionEvents = notifySessionEvents
     self.terminalMouseReporting = terminalMouseReporting
+    self.wrapsSourceText = wrapsSourceText
     self.toolOverrides = toolOverrides
   }
 
@@ -162,7 +168,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   enum CodingKeys: String, CodingKey {
     case repos, workspaceRoot, editor, editorPath, terminalPath, branchPrefix
     case terminalFont, terminalFontSize, terminalForeground
-    case notifySessionEvents, terminalMouseReporting, toolOverrides
+    case notifySessionEvents, terminalMouseReporting, wrapsSourceText, toolOverrides
   }
 
   public init(from decoder: Decoder) throws {
@@ -180,6 +186,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     notifySessionEvents = try container.decodeIfPresent(Bool.self, forKey: .notifySessionEvents)
     terminalMouseReporting = try container.decodeIfPresent(
       Bool.self, forKey: .terminalMouseReporting)
+    wrapsSourceText = try container.decodeIfPresent(Bool.self, forKey: .wrapsSourceText)
     toolOverrides =
       try container.decodeIfPresent([String: String].self, forKey: .toolOverrides) ?? [:]
   }

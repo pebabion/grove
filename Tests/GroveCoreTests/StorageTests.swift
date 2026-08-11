@@ -115,6 +115,7 @@ struct LibraryDecodingTests {
     // one is added without decodeIfPresent, which is the whole point of it.
     #expect(library.notifySessionEvents == nil)
     #expect(library.terminalMouseReporting == nil)
+    #expect(library.wrapsSourceText == nil)
   }
 
   @Test("reads a file holding a setting Grove no longer has")

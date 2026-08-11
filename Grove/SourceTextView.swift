@@ -154,6 +154,7 @@ final class FindableTextView: NSTextView {
 struct SourceTextView: NSViewRepresentable {
   let content: NSAttributedString
   let background: NSColor
+  let wraps: Bool
 
   func makeNSView(context: Context) -> NSScrollView {
     let storage = NSTextStorage()
@@ -162,9 +163,6 @@ struct SourceTextView: NSViewRepresentable {
 
     let container = NSTextContainer(
       size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
-    // Wrapped. Long lines were unreachable before: wrapping was off and the horizontal
-    // scroller never appeared, so the right-hand end of a line simply could not be read.
-    container.widthTracksTextView = true
     layout.addTextContainer(container)
 
     let text = FindableTextView(frame: .zero, textContainer: container)
@@ -177,8 +175,6 @@ struct SourceTextView: NSViewRepresentable {
     text.drawsBackground = true
     text.textContainerInset = NSSize(width: 10, height: 8)
     text.isVerticallyResizable = true
-    text.isHorizontallyResizable = false
-    text.autoresizingMask = [NSView.AutoresizingMask.width]
     text.minSize = NSSize(width: 0, height: 0)
     text.maxSize = NSSize(
       width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -187,8 +183,8 @@ struct SourceTextView: NSViewRepresentable {
     scroll.drawsBackground = true
     scroll.documentView = text
     scroll.hasVerticalScroller = true
-    scroll.hasHorizontalScroller = false
     scroll.autohidesScrollers = true
+    Self.apply(wraps: wraps, to: text, in: scroll)
 
     let ruler = LineNumberRuler(textView: text)
     scroll.verticalRulerView = ruler
@@ -201,10 +197,38 @@ struct SourceTextView: NSViewRepresentable {
     return scroll
   }
 
+  /// Wrapping, or a line that runs on and a scroller to follow it.
+  ///
+  /// Both halves matter: with `widthTracksTextView` off, the container must also be given
+  /// an unbounded width and the text view must be allowed to grow, or the line is laid
+  /// out beyond a view that never widens and cannot be scrolled to. That combination is
+  /// what left long lines unreachable the first time.
+  static func apply(wraps: Bool, to text: NSTextView, in scroll: NSScrollView) {
+    guard let container = text.textContainer else { return }
+
+    container.widthTracksTextView = wraps
+    container.size = NSSize(
+      width: wraps ? scroll.contentSize.width : CGFloat.greatestFiniteMagnitude,
+      height: CGFloat.greatestFiniteMagnitude)
+
+    text.isHorizontallyResizable = !wraps
+    text.autoresizingMask = wraps ? [.width] : [.width, .height]
+    text.maxSize = NSSize(
+      width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+    if wraps {
+      text.frame.size.width = scroll.contentSize.width
+    }
+
+    scroll.hasHorizontalScroller = !wraps
+  }
+
   func updateNSView(_ scroll: NSScrollView, context: Context) {
     guard let text = scroll.documentView as? NSTextView else { return }
     text.backgroundColor = background
     scroll.backgroundColor = background
+    if (text.textContainer?.widthTracksTextView ?? true) != wraps {
+      Self.apply(wraps: wraps, to: text, in: scroll)
+    }
 
     guard text.attributedString() != content else { return }
     text.textStorage?.setAttributedString(content)
