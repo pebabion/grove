@@ -66,16 +66,22 @@ struct FileBrowser: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         List(matches, selection: $selection) { file in
-          HStack(spacing: 6) {
-            RepoSwatch(repo: file.repo, size: 7)
+          HStack(spacing: 7) {
+            FileTypeIcon(path: file.path)
             VStack(alignment: .leading, spacing: 1) {
               Text(file.name)
                 .lineLimit(1)
-              Text(file.path)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.head)
+              // The repo moves in here now that its colour is no longer the row's
+              // marker, so it is still clear which of the workspace's repos a file
+              // belongs to.
+              HStack(spacing: 4) {
+                RepoSwatch(repo: file.repo, size: 6)
+                Text(file.path)
+                  .lineLimit(1)
+                  .truncationMode(.head)
+              }
+              .font(.caption2)
+              .foregroundStyle(.secondary)
             }
           }
           .tag(file)
@@ -126,7 +132,8 @@ struct FileBrowser: View {
 
   private func header(for file: FileMatch) -> some View {
     HStack(spacing: 8) {
-      RepoSwatch(repo: file.repo, size: 8)
+      FileTypeIcon(path: file.path, size: 13)
+      RepoSwatch(repo: file.repo, size: 7)
       Text(file.path)
         .font(.system(.caption, design: .monospaced))
         .lineLimit(1)

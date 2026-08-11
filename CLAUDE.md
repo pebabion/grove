@@ -360,6 +360,16 @@ search field or the file list. The shortcut is caught in `performKeyEquivalent` 
 action passed through a menu item's tag, which is the only way in. Not ⌘ + E, the usual
 "use the selection" shortcut: the header above already opens the file in an editor with it.
 
+Files carry a symbol for what they are and their language's colour: a symbol per
+language would be the other way round, and macOS has no Python glyph to offer. Code all
+shares one glyph and separates by colour, which is what tells Python from TypeScript
+among rows that otherwise look alike. Anything unrecognised gets a plain document and no
+colour — a wrong colour claims a file is something it is not.
+
+**Check an SF Symbol name exists before shipping it**, with
+`NSImage(systemSymbolName:accessibilityDescription:)`: an unknown name draws nothing at
+all, and a blank column is not an obvious thing to go looking for.
+
 Read-only, deliberately. Agents rewrite these files while they are on screen, so
 anything that could save would need to know what changed underneath it, and Grove
 already opens a real editor in one click.

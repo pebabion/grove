@@ -297,3 +297,56 @@ struct SearchNarrowingTests {
     #expect(FileIndex(many.reversed()).matches(for: "file123") == index.matches(for: "file123"))
   }
 }
+
+@Suite("giving a file an icon")
+struct FileIconTests {
+  @Test("code gets a code symbol and its language's colour")
+  func codeFiles() {
+    let python = FileIcon.named(for: "app/api/views.py")
+    #expect(python.symbol == "chevron.left.forwardslash.chevron.right")
+    #expect(python.colour == "#4B8BBE")
+
+    // The colour is what separates rows that all look like code.
+    #expect(FileIcon.named(for: "Grove/AppModel.swift").colour != python.colour)
+  }
+
+  @Test("things that are not code get symbols of their own")
+  func distinctSymbols() {
+    // A shell script, a note and a pile of configuration should not look alike.
+    #expect(FileIcon.named(for: "scripts/setup.sh").symbol == "terminal")
+    #expect(FileIcon.named(for: "README.md").symbol == "doc.richtext")
+    #expect(FileIcon.named(for: "package.json").symbol == "curlybraces")
+    #expect(FileIcon.named(for: "deploy.yaml").symbol == "list.bullet.rectangle")
+    #expect(FileIcon.named(for: "Dockerfile").symbol == "shippingbox")
+    #expect(FileIcon.named(for: "Makefile").symbol == "hammer")
+    #expect(FileIcon.named(for: "schema.sql").symbol == "cylinder")
+  }
+
+  @Test("files that are not text at all are recognised too")
+  func nonTextFiles() {
+    #expect(FileIcon.named(for: "assets/logo.png").symbol == "photo")
+    #expect(FileIcon.named(for: "docs/manual.pdf").symbol == "doc.richtext")
+    #expect(FileIcon.named(for: "vendor/bundle.tar").symbol == "archivebox")
+    #expect(FileIcon.named(for: "data/rows.csv").symbol == "tablecells")
+  }
+
+  @Test("a dotfile reads as configuration")
+  func dotfiles() {
+    #expect(FileIcon.named(for: ".gitattributes").symbol == "terminal")
+    #expect(FileIcon.named(for: ".dockerignore").symbol == "gearshape")
+  }
+
+  @Test("anything unrecognised gets a plain document and no colour")
+  func unknown() {
+    // A wrong colour is worse than none: it says a file is something it is not.
+    let icon = FileIcon.named(for: "notes")
+    #expect(icon.symbol == "doc")
+    #expect(icon.colour == nil)
+  }
+
+  @Test("case does not matter")
+  func caseInsensitive() {
+    #expect(FileIcon.named(for: "SETUP.SH") == FileIcon.named(for: "setup.sh"))
+    #expect(FileIcon.named(for: "README.MD").symbol == "doc.richtext")
+  }
+}
