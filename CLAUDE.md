@@ -360,6 +360,17 @@ Two things were measured and both changed the design:
   bonus that makes "gtv" find `GroveTerminalView`. Match against folded bytes, take
   bonuses from the original; ASCII folding keeps the length so the two agree position for
   position.
+- **Measure search in release, and in the app in debug.** The same search was 3.5ms
+  built with optimisation and 230ms without, and the app people test is the debug one. It
+  is now under 35ms there and under 10ms in a release build, by scoring across every core
+  with `concurrentPerform` — the work is per file and shares nothing, so there is nothing
+  to lock.
+- **Searching runs off the main actor, cancelled on every keystroke**, after a 25ms pause
+  that collapses a burst of typing into one search. This matters more than the raw number:
+  typing that waits on a search feels broken however fast the search is.
+- **A query that only adds characters searches the previous matches**, not every file,
+  because adding to a query can only exclude. The result carries every match rather than
+  the visible slice, or the next keystroke would search a set already truncated to 200.
 - **Searching cost 91ms a keystroke** over 25,000 paths — what three real repos hold.
   Lowercasing and splitting into `Character`s per keystroke was most of it, and sorting
   every match was the rest. `FileIndex` folds each path to lowercase UTF-8 bytes once and

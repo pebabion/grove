@@ -77,6 +77,18 @@ public enum FuzzyScore {
     guard !needle.isEmpty else { return 0 }
     guard needle.count <= text.count else { return nil }
 
+    // One character needs no alignment: there is nothing to align it against, and the
+    // best it can do is the best-placed occurrence. This is the first keystroke, when
+    // nothing has been narrowed down yet and every file is still a candidate.
+    if needle.count == 1 {
+      let target = needle[0]
+      var best: Int32 = 0
+      for index in text.indices where folded(text[index]) == target {
+        best = max(best, match + bonuses[index] * firstCharMultiplier)
+      }
+      return best > 0 ? best : nil
+    }
+
     // A cheap pass first: if the characters are not present in order, no alignment
     // exists and the expensive part is skipped. This rejects almost everything.
     guard let window = window(needle, in: text) else { return nil }

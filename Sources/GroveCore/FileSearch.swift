@@ -59,20 +59,43 @@ public struct FileIndex: Sendable {
     Array(text.utf8).map { FuzzyScore.folded($0) }
   }
 
+  /// What a search found, and enough to make the next one cheaper.
+  ///
+  /// Editors stay quick by not starting over. Every file that matches "peop" also
+  /// matches "peo", so a query that extends the last one only has to look at what the
+  /// last one found — and after two or three characters that is a few hundred files
+  /// rather than seventeen thousand.
+  public struct Result: Sendable {
+    public let query: String
+    public let matches: [FileMatch]
+    /// Every entry that matched, not just the ones shown, so the next query can narrow
+    /// against the full set rather than the visible slice.
+    fileprivate let candidates: [Int32]
+
+  }
+
   /// Ranked matches for `query`, best first.
   ///
   /// Subsequence matching, the way every editor's file finder works: "gtv" finds
   /// `GroveTerminalView.swift`. Anything stricter means typing whole path fragments,
   /// and anything looser fills the list with files that merely share letters.
   public func matches(for query: String, limit: Int = 200) -> [FileMatch] {
+    search(query, limit: limit, refining: nil).matches
+  }
+
+  /// Searches, narrowing against a previous result when the query grew out of it.
+  ///
+  /// Adding characters only ever makes the requirement stricter — a longer word is a
+  /// stricter subsequence, and another word is another requirement — so anything the
+  /// new query matches, the old one matched too. Narrowing is therefore exact, not an
+  /// approximation.
+  public func search(_ query: String, limit: Int = 200, refining previous: Result?) -> Result {
     let trimmed = query.trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty else {
-      return
-        entries
-        .map(\.match)
-        .sorted { $0.path < $1.path }
-        .prefix(limit)
-        .map { $0 }
+      let all = entries.map(\.match).sorted { $0.path < $1.path }
+      return Result(
+        query: query, matches: Array(all.prefix(limit)),
+        candidates: Array(Int32(0)..<Int32(entries.count)))
     }
 
     // Split on whitespace and require every word, each matched on its own. A query is
@@ -84,25 +107,94 @@ public struct FileIndex: Sendable {
       .split(whereSeparator: \.isWhitespace)
       .map { Self.folded(String($0)) }
     guard !words.isEmpty else {
-      return entries.map(\.match).sorted { $0.path < $1.path }.prefix(limit).map { $0 }
+      let all = entries.map(\.match).sorted { $0.path < $1.path }
+      return Result(
+        query: query, matches: Array(all.prefix(limit)),
+        candidates: Array(Int32(0)..<Int32(entries.count)))
     }
     // Kept as a running best rather than scored-then-sorted. A one-letter query matches
     // nearly every file, and sorting twenty-five thousand results took fifty
     // milliseconds a keystroke on its own -- longer than the scoring it followed.
-    var best: [Ranked] = []
-    best.reserveCapacity(limit)
+    // Only what the previous query matched, when this one grew out of it.
+    let searching: [Int32] =
+      previous.flatMap { Self.narrows(from: $0.query, to: query) ? $0.candidates : nil }
+      ?? Array(Int32(0)..<Int32(entries.count))
+    // Split across the cores. Scoring one file says nothing about scoring another, so
+    // there is nothing to share and nothing to lock; each core keeps its own best few
+    // and they are merged at the end. This is where the time goes, and it is the same
+    // trick the editors people compare this to use.
+    let cores = max(1, min(ProcessInfo.processInfo.activeProcessorCount, 12))
+    let chunks = searching.count >= Self.parallelFrom ? cores : 1
+    let chunkSize = (searching.count + chunks - 1) / max(chunks, 1)
 
-    for entry in entries {
-      guard let score = Self.score(words: words, in: entry) else { continue }
-      let candidate = Ranked(match: entry.match, score: score)
-      if best.count == limit, let worst = best.last, !Self.isBetter(candidate, than: worst) {
-        continue
+    var perChunk = [Found](repeating: Found(), count: chunks)
+    perChunk.withUnsafeMutableBufferPointer { output in
+      let sink = UncheckedSendable(output)
+      DispatchQueue.concurrentPerform(iterations: chunks) { chunk in
+        let start = chunk * chunkSize
+        let end = min(start + chunkSize, searching.count)
+        guard start < end else { return }
+
+        var found = Found()
+        found.survivors.reserveCapacity((end - start) / 4)
+        for index in searching[start..<end] {
+          let entry = entries[Int(index)]
+          guard let score = Self.score(words: words, in: entry) else { continue }
+          found.survivors.append(index)
+
+          let candidate = Ranked(match: entry.match, score: score)
+          if found.best.count == limit, let worst = found.best.last,
+            !Self.isBetter(candidate, than: worst)
+          {
+            continue
+          }
+          found.best.insert(candidate, at: Self.insertionPoint(for: candidate, in: found.best))
+          if found.best.count > limit { found.best.removeLast() }
+        }
+        sink.value[chunk] = found
       }
-      best.insert(candidate, at: Self.insertionPoint(for: candidate, in: best))
-      if best.count > limit { best.removeLast() }
     }
 
-    return best.map(\.match)
+    // Merged with the same comparator, so the answer does not depend on how the work
+    // happened to be divided.
+    var best: [Ranked] = []
+    var survivors: [Int32] = []
+    for found in perChunk {
+      survivors += found.survivors
+      for candidate in found.best {
+        if best.count == limit, let worst = best.last, !Self.isBetter(candidate, than: worst) {
+          continue
+        }
+        best.insert(candidate, at: Self.insertionPoint(for: candidate, in: best))
+        if best.count > limit { best.removeLast() }
+      }
+    }
+
+    return Result(query: query, matches: best.map(\.match), candidates: survivors)
+  }
+
+  /// Whether `query` can only match a subset of what `earlier` matched.
+  ///
+  /// True when it simply has more typed on the end. Deleting a character, or changing
+  /// one in the middle, can bring files back, so those start again.
+  static func narrows(from earlier: String, to query: String) -> Bool {
+    !earlier.isEmpty && query.hasPrefix(earlier)
+  }
+
+  /// Below this, threads cost more than they save.
+  private static let parallelFrom = 2000
+
+  /// One core's share of the work.
+  private struct Found: Sendable {
+    var best: [Ranked] = []
+    var survivors: [Int32] = []
+  }
+
+  /// A buffer handed to `concurrentPerform`, where each iteration writes to its own
+  /// index and no two ever touch the same one.
+  private struct UncheckedSendable<Value>: @unchecked Sendable {
+    let value: Value
+    init(_ value: Value) { self.value = value }
   }
 
   private struct Ranked: Sendable {

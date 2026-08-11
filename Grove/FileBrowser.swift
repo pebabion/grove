@@ -56,6 +56,9 @@ struct FileBrowser: View {
   /// preparation on every keystroke, which is the whole cost.
   @State private var index = FileIndex([])
   @State private var query = ""
+  /// The last completed search. Held rather than computed, because searching is work
+  /// and a computed property would redo it for every pass over the body.
+  @State private var result: FileIndex.Result?
   @State private var selection: FileMatch?
   @State private var contents: SourceContents?
   /// Held rather than recomputed: highlighting is about a millisecond per kilobyte, and
@@ -64,9 +67,7 @@ struct FileBrowser: View {
   @State private var isLoading = true
   @FocusState private var searchFocused: Bool
 
-  private var matches: [FileMatch] {
-    index.matches(for: query)
-  }
+  private var matches: [FileMatch] { result?.matches ?? [] }
 
   var body: some View {
     HSplitView {
@@ -75,6 +76,9 @@ struct FileBrowser: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .task { await load() }
+    // Cancelled and restarted on every keystroke, and the search itself runs away from
+    // the main actor. Typing is never waiting on a search, however large the workspace.
+    .task(id: query) { await search() }
   }
 
   private var list: some View {
@@ -92,6 +96,11 @@ struct FileBrowser: View {
 
       if isLoading {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else if matches.isEmpty, !query.isEmpty, result != nil {
+        Text("No file matches")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         List(matches, selection: $selection) { file in
           HStack(spacing: 6) {
@@ -203,12 +212,40 @@ struct FileBrowser: View {
     workspace.url.appending(path: file.repo).appending(path: file.path)
   }
 
+  /// Runs the search off the main actor, a beat after the typing stops.
+  ///
+  /// The pause is what stops a burst of keystrokes starting a search each: the task is
+  /// cancelled and replaced before the sleep is over, so only the last one runs. The
+  /// previous result is passed along so the search can narrow against it instead of
+  /// starting from every file again.
+  private func search() async {
+    let typed = query
+    if !typed.isEmpty {
+      try? await Task.sleep(for: .milliseconds(25))
+      guard !Task.isCancelled else { return }
+    }
+
+    let searching = index
+    let previous = result
+    let found = await Task.detached(priority: .userInitiated) {
+      searching.search(typed, limit: 200, refining: previous)
+    }.value
+
+    guard !Task.isCancelled else { return }
+    result = found
+    // Keep a selection that is still on screen, and offer the best match otherwise.
+    if let selection, !found.matches.contains(selection) {
+      self.selection = nil
+    }
+  }
+
   private func load() async {
     let found = await model.workspaceFiles(in: workspace)
     // Built off the main actor: twenty-five thousand paths is enough preparation to be
     // worth not doing where the window is drawn.
     index = await Task.detached(priority: .userInitiated) { FileIndex(found) }.value
     isLoading = false
+    await search()
   }
 
   /// Reads and colours the file, both away from the main actor.

@@ -242,3 +242,58 @@ struct FileIndexTests {
     #expect(FileIndex([]).count == 0)
   }
 }
+
+@Suite("narrowing a search instead of starting over")
+struct SearchNarrowingTests {
+  private let files = [
+    FileMatch(path: "skills/system/people-search/SKILL.md", repo: "agent-graph"),
+    FileMatch(path: "agent_graph/graphs/people_search.py", repo: "agent-graph"),
+    FileMatch(path: "agent_graph/tools/warehouse_sql.py", repo: "agent-graph"),
+    FileMatch(path: "Grove/GroveTerminalView.swift", repo: "grove"),
+  ]
+
+  @Test("recognises a query that only adds to the last one")
+  func recognisesGrowth() {
+    // Adding characters can only ever exclude files, so the previous matches are a
+    // complete set to search. Deleting or editing can bring files back.
+    #expect(FileIndex.narrows(from: "peo", to: "peop"))
+    #expect(FileIndex.narrows(from: "people", to: "people skill"))
+    #expect(!FileIndex.narrows(from: "peop", to: "peo"))
+    #expect(!FileIndex.narrows(from: "peop", to: "seop"))
+    #expect(!FileIndex.narrows(from: "", to: "p"))
+  }
+
+  @Test("narrowing gives the same answer as starting over")
+  func narrowingIsExact() {
+    // The whole optimisation rests on this: it must be a shortcut, not an approximation.
+    let index = FileIndex(files)
+    var previous: FileIndex.Result?
+    for query in ["p", "pe", "peo", "peop", "people", "people ", "people s", "people skill"] {
+      let narrowed = index.search(query, refining: previous)
+      let fresh = index.search(query, refining: nil)
+      #expect(narrowed.matches == fresh.matches, "differs at \"\(query)\"")
+      previous = narrowed
+    }
+  }
+
+  @Test("a result carries every match, not just the ones shown")
+  func carriesEveryMatch() {
+    // Narrowing against the visible slice would lose files the next keystroke needs.
+    let many = (0..<500).map { FileMatch(path: "src/file\($0)_thing.py", repo: "r") }
+    let result = FileIndex(many).search("thing", limit: 10, refining: nil)
+    #expect(result.matches.count == 10)
+
+    let next = FileIndex(many).search("thingy", limit: 10, refining: result)
+    let fresh = FileIndex(many).search("thingy", limit: 10, refining: nil)
+    #expect(next.matches == fresh.matches)
+  }
+
+  @Test("splitting the work across cores does not change the answer")
+  func parallelIsDeterministic() {
+    // Enough files to cross the threshold where the work is divided.
+    let many = (0..<5000).map { FileMatch(path: "src/module\($0 % 50)/file\($0).py", repo: "r") }
+    let index = FileIndex(many)
+    #expect(index.matches(for: "file123") == index.matches(for: "file123"))
+    #expect(FileIndex(many.reversed()).matches(for: "file123") == index.matches(for: "file123"))
+  }
+}
