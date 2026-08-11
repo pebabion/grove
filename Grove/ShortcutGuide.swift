@@ -53,11 +53,11 @@ struct ShortcutGuide: View {
   ]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 18) {
+    VStack(alignment: .leading, spacing: 10) {
       Text("Shortcuts")
         .font(.headline)
 
-      HStack(alignment: .top, spacing: 40) {
+      HStack(alignment: .top, spacing: 24) {
         ForEach(groups) { group in
           VStack(alignment: .leading, spacing: 7) {
             Text(group.title)
@@ -75,14 +75,18 @@ struct ShortcutGuide: View {
                   .font(.caption)
                   .foregroundStyle(.tertiary)
                   .lineLimit(1)
+                Spacer(minLength: 0)
               }
             }
           }
+          // Even shares of the width, so three narrow columns do not huddle at the left
+          // of a wide window.
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
-
+      .padding(14)
+      .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
     }
-    .padding(.vertical, 4)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
