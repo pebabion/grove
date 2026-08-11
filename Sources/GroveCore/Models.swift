@@ -111,10 +111,6 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// relay — follows it, because nobody wants to be asked about that separately.
   public var notifySessionEvents: Bool?
 
-  /// Whether the shortcut guide has been dismissed. It is education, and education
-  /// should be able to stop.
-  public var hidesShortcutGuide: Bool?
-
   /// Whether the file viewer wraps long lines. On by default: with it off, reading the
   /// end of a line means scrolling sideways.
   public var wrapsSourceText: Bool?
@@ -145,7 +141,6 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     notifySessionEvents: Bool? = nil,
     terminalMouseReporting: Bool? = nil,
     wrapsSourceText: Bool? = nil,
-    hidesShortcutGuide: Bool? = nil,
     toolOverrides: [String: String] = [:]
   ) {
     self.repos = repos
@@ -160,7 +155,6 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     self.notifySessionEvents = notifySessionEvents
     self.terminalMouseReporting = terminalMouseReporting
     self.wrapsSourceText = wrapsSourceText
-    self.hidesShortcutGuide = hidesShortcutGuide
     self.toolOverrides = toolOverrides
   }
 
@@ -174,8 +168,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   enum CodingKeys: String, CodingKey {
     case repos, workspaceRoot, editor, editorPath, terminalPath, branchPrefix
     case terminalFont, terminalFontSize, terminalForeground
-    case notifySessionEvents, terminalMouseReporting, wrapsSourceText
-    case hidesShortcutGuide, toolOverrides
+    case notifySessionEvents, terminalMouseReporting, wrapsSourceText, toolOverrides
   }
 
   public init(from decoder: Decoder) throws {
@@ -194,7 +187,6 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalMouseReporting = try container.decodeIfPresent(
       Bool.self, forKey: .terminalMouseReporting)
     wrapsSourceText = try container.decodeIfPresent(Bool.self, forKey: .wrapsSourceText)
-    hidesShortcutGuide = try container.decodeIfPresent(Bool.self, forKey: .hidesShortcutGuide)
     toolOverrides =
       try container.decodeIfPresent([String: String].self, forKey: .toolOverrides) ?? [:]
   }

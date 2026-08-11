@@ -435,8 +435,9 @@ Two things were measured and both changed the design:
 
 ## The shortcut guide
 
-`ShortcutGuide` fills the empty part of a workspace when the terminal and the files are
-both closed, and can be dismissed for good. It is the only place the shortcuts are written
+`ShortcutGuide` sits under the repo list as part of the page, and goes when the terminal
+opens. Not in the space left over: laid out that way it drifted into the lower third of
+the window, because the scroll view above took everything it was offered first. It is the only place the shortcuts are written
 down for a reader, so **anything bound in the menus or a view belongs in that list**, and
 every line in it is a claim that has to be true.
 

@@ -3,9 +3,9 @@ import SwiftUI
 
 /// The shortcuts Grove has, shown where there is nothing else to put.
 ///
-/// A workspace with the terminal and the files both closed leaves most of the window
-/// empty, and a shortcut nobody knows about is a shortcut nobody uses. It goes away the
-/// moment either is opened, and can be dismissed for good once it has done its job.
+/// Sits under the repo list, as part of the page rather than floating in whatever space
+/// is left over — which put it adrift in the lower third of the window. It goes when the
+/// terminal opens, since by then the window has a job to do.
 ///
 /// This list is the only place they are written down for a reader, so it has to match
 /// what the app actually binds. Anything added to the menus belongs here too.
@@ -53,7 +53,10 @@ struct ShortcutGuide: View {
   ]
 
   var body: some View {
-    VStack(spacing: 18) {
+    VStack(alignment: .leading, spacing: 18) {
+      Text("Shortcuts")
+        .font(.headline)
+
       HStack(alignment: .top, spacing: 40) {
         ForEach(groups) { group in
           VStack(alignment: .leading, spacing: 7) {
@@ -78,14 +81,8 @@ struct ShortcutGuide: View {
         }
       }
 
-      Button("Hide these") {
-        model.library.hidesShortcutGuide = true
-        model.saveLibrary()
-      }
-      .buttonStyle(.link)
-      .font(.caption)
     }
-    .padding(28)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    .padding(.vertical, 4)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }

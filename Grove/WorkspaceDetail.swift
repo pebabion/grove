@@ -55,6 +55,12 @@ struct WorkspaceDetail: View {
           VStack(alignment: .leading, spacing: 20) {
             repoList
             addRepoSection
+            // Part of the page rather than floating in whatever space was left over,
+            // which put it adrift in the lower third of the window.
+            if !showingTerminal {
+              ShortcutGuide()
+                .padding(.top, 12)
+            }
           }
           .padding(24)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,13 +86,6 @@ struct WorkspaceDetail: View {
         Spacer()
       }
 
-      // Only where there is nothing else to look at: the repo list is short, the terminal
-      // is closed and no file is open. It leaves as soon as the window has a job to do.
-      if showingDetails, !showingFiles, !showingTerminal,
-        model.library.hidesShortcutGuide != true
-      {
-        ShortcutGuide()
-      }
     }
     .navigationTitle(workspace.name)
     .onChange(of: showingTerminal) { _, opened in
