@@ -354,12 +354,28 @@ public struct WorkspaceService: Sendable {
     deleteBranch: Bool,
     onUpdate: @escaping @Sendable (ProvisionUpdate) -> Void
   ) async {
+    await removeRepo(
+      member, from: workspace, library: library, deleteBranch: deleteBranch,
+      onUpdate: onUpdate, within: { _, _ in })
+  }
+
+  /// The same, reporting where it has got to within this one repo, from 0 to 1.
+  ///
+  /// The weights are guesses at what takes the time, and only roughly: removing the
+  /// worktree deletes every file in it, which dwarfs the rest, and a teardown hook can
+  /// take as long as it likes. Rough is enough for a bar that has to keep moving.
+  func removeRepo(
+    _ member: WorkspaceMember,
+    from workspace: Workspace,
+    library: RepoLibrary,
+    deleteBranch: Bool,
+    onUpdate: @escaping @Sendable (ProvisionUpdate) -> Void,
+    within: @escaping @Sendable (String, Double) -> Void
+  ) async {
     let repo = library[member.repoName]
 
     if let repo, let hook = resolver.resolve(phase: .teardown, repo: repo, worktree: member.url) {
-      onUpdate(
-        ProvisionUpdate(
-          repo: member.repoName, state: .settingUp, detail: "Running the teardown hook"))
+      report("Running the teardown hook", 0.05)
       let result = try? await hooks.run(
         hook, worktree: member.url, repo: repo, workspace: workspace.url,
         branch: member.branch ?? workspace.file.branch)
@@ -377,29 +393,30 @@ public struct WorkspaceService: Sendable {
     // Each step says what it is doing rather than one line covering all of them.
     // Removing a worktree is the one operation here that destroys work, so a person
     // watching it deserves to know which part is taking the time and what it touched.
-    func report(_ detail: String) {
+    func report(_ detail: String, _ progress: Double = 0) {
       onUpdate(ProvisionUpdate(repo: member.repoName, state: .settingUp, detail: detail))
+      within(detail, progress)
     }
 
     if let repo {
-      report("Removing the worktree")
+      report("Removing the worktree", 0.35)
       let removal = try? await git.removeWorktree(repo: repo.url, at: member.url, force: true)
       if removal == .byHand {
         // Worth saying: git declined and the directory was deleted outright.
-        report("Git would not remove it, so the folder was deleted")
+        report("Git would not remove it, so the folder was deleted", 0.75)
       }
 
       if deleteBranch, let branch = member.branch {
-        report("Deleting the branch \(branch)")
+        report("Deleting the branch \(branch)", 0.8)
         try? await git.deleteBranch(repo: repo.url, branch: branch, force: true)
       }
     } else if FileManager.default.fileExists(atPath: member.url.path) {
       // No entry in the library, so there is no clone to ask: the folder is all there is.
-      report("Deleting the folder — this repo is not in the library")
+      report("Deleting the folder — this repo is not in the library", 0.35)
       try? FileManager.default.removeItem(at: member.url)
     }
 
-    report("Updating the workspace file")
+    report("Updating the workspace file", 0.9)
     let metadataURL = workspace.url.appending(path: GroveLocations.workspaceFileName)
     if var file = try? store.load(WorkspaceFile.self, from: metadataURL) {
       file.repos.removeAll { $0 == member.repoName }
@@ -407,7 +424,7 @@ public struct WorkspaceService: Sendable {
     }
 
     // The removed repo's skills went with its worktree, so its links are now dangling.
-    report("Relinking skills")
+    report("Relinking skills", 0.95)
     linkSkills(in: workspace.url)
 
     onUpdate(
@@ -444,21 +461,55 @@ public struct WorkspaceService: Sendable {
     // One step per repo, plus the folder at the end.
     let steps = Double(workspace.members.count + 1)
     for (index, member) in workspace.members.enumerated() {
+      let base = Double(index) / steps
       onPhase(
         WorkOutline(
           label: "Removing \(member.repoName) — \(index + 1) of \(workspace.members.count)",
-          fraction: Double(index) / steps))
+          fraction: base))
       await removeRepo(
-        member, from: workspace, library: library, deleteBranch: deleteBranches, onUpdate: onUpdate)
+        member, from: workspace, library: library, deleteBranch: deleteBranches,
+        onUpdate: onUpdate,
+        within: { detail, progress in
+          onPhase(
+            WorkOutline(
+              label: "\(member.repoName): \(detail.prefix(1).lowercased())\(detail.dropFirst())",
+              fraction: base + progress / steps))
+        })
     }
 
     if FileManager.default.fileExists(atPath: workspace.url.path) {
-      onPhase(
-        WorkOutline(
-          label: "Removing the workspace folder",
-          fraction: Double(workspace.members.count) / steps))
-      try FileManager.default.removeItem(at: workspace.url)
+      let base = Double(workspace.members.count) / steps
+      try removeFolder(workspace.url) { name, progress in
+        onPhase(
+          WorkOutline(
+            label: "Removing \(name)", fraction: base + progress / steps))
+      }
     }
     onPhase(WorkOutline(label: "Removed \(workspace.name)", fraction: 1))
+  }
+
+  /// Deletes a directory a child at a time, naming each one.
+  ///
+  /// One `removeItem` on the whole tree says nothing for as long as it takes, and on a
+  /// workspace holding a few `node_modules` that is most of the wait. Going one child at a
+  /// time costs nothing and turns the slowest part of a teardown into something that moves.
+  private func removeFolder(
+    _ folder: URL, report: (_ name: String, _ progress: Double) -> Void
+  ) throws {
+    let manager = FileManager.default
+    let children =
+      (try? manager.contentsOfDirectory(atPath: folder.path))?.sorted() ?? []
+
+    for (index, child) in children.enumerated() {
+      report(child, Double(index) / Double(max(children.count, 1)))
+      try? manager.removeItem(at: folder.appending(path: child))
+    }
+
+    // The folder itself last, named for what it is rather than by its own name, which
+    // beside a list of children reads as though a child had the same name.
+    report("the workspace folder", 1)
+    if manager.fileExists(atPath: folder.path) {
+      try manager.removeItem(at: folder)
+    }
   }
 }

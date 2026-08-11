@@ -219,6 +219,9 @@ struct TeardownProgressTests {
     let report = try await removalReport(deleteBranches: false)
     #expect(report.phases.contains("Removing backend — 1 of 2"))
     #expect(report.phases.contains("Removing frontend — 2 of 2"))
+    // The folder goes a child at a time, so it is named piece by piece and then as a
+    // whole, rather than in one line that would sit there for the length of the delete.
+    #expect(report.phases.contains("Removing grove.json"))
     #expect(report.phases.contains("Removing the workspace folder"))
     // The last word is that it is done, which is what takes the bar to the end.
     #expect(report.phases.last == "Removed doomed")
@@ -240,5 +243,31 @@ extension TeardownProgressTests {
     #expect(report.fractions.first == 0)
     #expect(report.fractions.last == 1)
     #expect(report.fractions.allSatisfy { $0 >= 0 && $0 <= 1 })
+  }
+}
+
+extension TeardownProgressTests {
+  @Test("the bar moves during a repo, not only between repos")
+  func movesWithinARepo() async throws {
+    // Two repos and a folder would be three updates. The point of the finer reporting is
+    // that the bar keeps moving through the parts that take the time.
+    let report = try await removalReport(deleteBranches: true)
+    #expect(report.phases.count > 8, "only \(report.phases.count) updates")
+    #expect(report.fractions == report.fractions.sorted())
+  }
+
+  @Test("names each thing it deletes from the workspace folder")
+  func namesWhatItDeletes() async throws {
+    // One removeItem on the whole tree says nothing for as long as it takes, which on a
+    // workspace holding node_modules is most of the wait.
+    let report = try await removalReport(deleteBranches: false)
+    #expect(report.phases.contains { $0.hasPrefix("Removing ") && $0.contains("grove.json") })
+  }
+
+  @Test("a step within a repo is attributed to that repo")
+  func attributesStepsToRepos() async throws {
+    let report = try await removalReport(deleteBranches: true)
+    #expect(report.phases.contains { $0.hasPrefix("backend: ") })
+    #expect(report.phases.contains { $0.contains("deleting the branch kelvin/doomed") })
   }
 }
