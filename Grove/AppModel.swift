@@ -932,7 +932,7 @@ final class AppModel {
 
     let updater = Updater(environment: toolPaths.processEnvironment())
     do {
-      let (temporary, _) = try await URLSession.shared.download(from: downloadURL)
+      let (temporary, _) = try await download(downloadURL)
       let image = FileManager.default.temporaryDirectory
         .appending(path: downloadURL.lastPathComponent)
       try? FileManager.default.removeItem(at: image)
@@ -961,11 +961,38 @@ final class AppModel {
       // quitting is the final step of the install rather than a side effect.
       NSApp.terminate(nil)
     } catch {
+      // Which step failed, because "could not connect to the server" says nothing about
+      // whether the download, the checksum or the swap was in progress.
+      let step = (updateStage ?? .downloading).rawValue.lowercased()
       errorMessage =
-        "\(error.localizedDescription)\n\nThe installed copy has not been touched."
+        "\(step.capitalized) \(update.version.description) failed: "
+        + "\(error.localizedDescription)\n\nThe installed copy has not been touched. "
+        + "The download page is open if you would rather do it by hand."
       NSWorkspace.shared.open(update.pageURL)
     }
   }
+
+  /// Downloads, trying twice.
+  ///
+  /// A release is published a moment before its file finishes uploading, so an update
+  /// asked for in that window fails to connect to something that is about to exist. One
+  /// retry after a pause covers that, and covers a connection dropped in passing.
+  private func download(_ url: URL) async throws -> (URL, URLResponse) {
+    do {
+      return try await URLSession.shared.download(from: url)
+    } catch let error as URLError where Self.worthRetrying.contains(error.code) {
+      Log.sessions.problem("download failed (\(error.code.rawValue)), trying once more")
+      try await Task.sleep(for: .seconds(2))
+      return try await URLSession.shared.download(from: url)
+    }
+  }
+
+  /// Failures that are worth a second attempt rather than a dialog. A refusal by the
+  /// server, or a file that is not there, would only fail again.
+  private static let worthRetrying: Set<URLError.Code> = [
+    .cannotConnectToHost, .networkConnectionLost, .timedOut, .cannotFindHost,
+    .dnsLookupFailed, .resourceUnavailable,
+  ]
 
   private func fetchText(_ url: URL) async throws -> String {
     var request = URLRequest(url: url)
