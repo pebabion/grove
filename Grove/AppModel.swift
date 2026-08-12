@@ -72,6 +72,13 @@ final class AppModel {
   /// not undo what you were reading.
   var fileWorkspaces: Set<URL> = []
 
+  /// Workspaces whose terminal is waiting for the folder to exist.
+  ///
+  /// A workspace appears in the list before it has been made — that is deliberate, so the
+  /// progress has somewhere to show — which means a terminal can be opened on a folder that
+  /// is not there yet. It waits rather than refusing.
+  private(set) var awaitingDirectory: Set<URL> = []
+
   /// How tall the terminal pane is when it shares the window with the repo list.
   /// Dragged by the divider between them, and kept for the same reason the rest of
   /// this is: switching workspaces should not reset it.
@@ -235,8 +242,46 @@ final class AppModel {
   }
 
   /// Starts a session in `directory` and brings it to the front.
+  ///
+  /// If the directory is not there yet — a workspace still being created — this waits for
+  /// it instead of quietly doing nothing. Doing nothing looked like the terminal being
+  /// killed: the pane opened, found no session, and closed itself again.
   @discardableResult
   func startSession(in workspace: Workspace, at directory: URL) -> TerminalSession? {
+    guard FileManager.default.fileExists(atPath: directory.path) else {
+      waitForDirectory(directory, in: workspace)
+      return nil
+    }
+    return startSessionNow(in: workspace, at: directory)
+  }
+
+  /// Waits for a directory to appear, then starts the session there.
+  ///
+  /// Bounded: a directory that never arrives means the creation failed, and a terminal
+  /// waiting for ever would be its own puzzle.
+  private func waitForDirectory(_ directory: URL, in workspace: Workspace) {
+    guard !awaitingDirectory.contains(workspace.url) else { return }
+    awaitingDirectory.insert(workspace.url)
+    Log.sessions.note("waiting for \(directory.lastPathComponent) before starting a session")
+
+    Task { @MainActor [weak self] in
+      for _ in 0..<300 {
+        try? await Task.sleep(for: .milliseconds(200))
+        guard let self, awaitingDirectory.contains(workspace.url) else { return }
+        guard FileManager.default.fileExists(atPath: directory.path) else { continue }
+
+        awaitingDirectory.remove(workspace.url)
+        Log.sessions.note("\(directory.lastPathComponent) arrived, starting a session")
+        startSessionNow(in: workspace, at: directory)
+        return
+      }
+      self?.awaitingDirectory.remove(workspace.url)
+      Log.sessions.problem("gave up waiting for \(directory.lastPathComponent)")
+    }
+  }
+
+  @discardableResult
+  private func startSessionNow(in workspace: Workspace, at directory: URL) -> TerminalSession? {
     let session = terminals.start(
       in: workspace.url,
       directory: directory,

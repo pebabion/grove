@@ -466,3 +466,15 @@ touch again.
 There is no Rescan button, no ⌘ R and no "measure again": all of it happens on its own. A
 control for something that already happens is a thing to wonder about. If the list ever
 goes stale, the fault is in the watching and belongs there rather than behind a button.
+
+## A workspace exists in the list before it exists on disk
+
+`createWorkspace` puts a placeholder in the list and selects it before any of the slow work,
+so the per-repo progress has somewhere to appear. That means a terminal can be opened on a
+workspace whose folder has not been created yet — `create` checks every branch for a
+conflicting worktree first, which takes a moment.
+
+`TerminalSessions.start` refuses a directory that is not there, and the pane closes itself
+when it has no sessions, so the two together looked exactly like a terminal being killed on
+open. Starting a session now waits for the folder to appear, bounded at a minute, and the
+pane says it is waiting rather than closing.
