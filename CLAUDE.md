@@ -509,3 +509,15 @@ with and ignore the rest.
 The decision lives in `TerminalKeys` in GroveCore, not in the view, so the combinations can
 be tested without a window. That is the whole reason the rule above is now provable rather
 than remembered.
+
+## Creating a workspace takes over the pane
+
+Setting up runs for minutes, and while it does the detail pane has nothing worth reading
+— a repo list whose every row says "waiting" — so `CreationProgress` fills it: the name,
+the branch, and a row per repo carrying its state and whatever step it is on. The line in
+the sidebar's footer stayed, but a few points at the bottom of a corner is not where
+someone is looking while they wait.
+
+A count of finished repos rather than a bar. Almost all of the time goes into installing
+dependencies, which reports nothing, so a bar would stand still through the longest part
+and read as stuck.

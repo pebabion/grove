@@ -46,9 +46,14 @@ struct WorkspaceDetail: View {
       summaryBar
       Divider()
 
-      // Files take the place of the repo list rather than sitting over the window:
-      // reading one is something you do while working, not instead of it.
-      if showingFiles {
+      // Creating takes over the pane. There is nothing else to read here yet — the repo
+      // list holds rows that say "waiting" — and setting up takes minutes, which is too
+      // long to leave the window looking like nothing is happening.
+      if model.isCreating(workspace) {
+        CreationProgress(workspace: workspace)
+      } else if showingFiles {
+        // Files take the place of the repo list rather than sitting over the window:
+        // reading one is something you do while working, not instead of it.
         FileBrowser(workspace: workspace)
       } else if showingDetails {
         ScrollView {
