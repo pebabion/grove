@@ -162,6 +162,8 @@ struct FileBrowser: View {
             .foregroundStyle(.tertiary)
             .lineLimit(1)
             .truncationMode(.head)
+            // Gives way before the button does, rather than shouldering it aside.
+            .layoutPriority(-1)
         }
         .font(.caption)
         .contentShape(Rectangle())
@@ -169,10 +171,21 @@ struct FileBrowser: View {
       .buttonStyle(.plain)
       .help("Copy \(copyable(file))")
 
+      // Beside the path, because that is what it copies. It moves with the path's length,
+      // which for a control usually argues against it — but a button that copies the thing
+      // next to it belongs next to it.
+      Button {
+        copy(file)
+      } label: {
+        Image(systemName: copied == file ? "checkmark" : "doc.on.doc")
+          .font(.caption)
+          .foregroundStyle(copied == file ? Color.green : .secondary)
+      }
+      .buttonStyle(.plain)
+      .help("Copy \(copyable(file))")
+
       Spacer(minLength: 12)
 
-      // The actions sit together on the right, at a fixed place, rather than drifting
-      // with the length of the path.
       HStack(spacing: 12) {
         Button {
           model.library.wrapsSourceText = !wraps
@@ -184,20 +197,6 @@ struct FileBrowser: View {
         }
         .buttonStyle(.plain)
         .help(wraps ? "Stop wrapping long lines" : "Wrap long lines")
-
-        Button {
-          copy(file)
-        } label: {
-          Label(
-            copied == file ? "Copied" : "Copy path",
-            systemImage: copied == file ? "checkmark" : "doc.on.doc"
-          )
-          .labelStyle(.iconOnly)
-          .font(.caption)
-          .foregroundStyle(copied == file ? Color.green : .secondary)
-        }
-        .buttonStyle(.plain)
-        .help("Copy \(copyable(file))")
 
         Button("Open in Editor") { model.openInEditor(url(of: file)) }
           .buttonStyle(.link)
