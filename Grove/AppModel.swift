@@ -83,6 +83,14 @@ final class AppModel {
     creatingWorkspaces.contains(workspace.url)
   }
 
+  /// Workspaces being taken apart, for the same reason: the pane has to know it is
+  /// watching a removal rather than showing a workspace that still exists.
+  private(set) var removingWorkspaces: Set<URL> = []
+
+  func isRemoving(_ workspace: Workspace) -> Bool {
+    removingWorkspaces.contains(workspace.url)
+  }
+
   /// How tall the terminal pane is when it shares the window with the repo list.
   /// Dragged by the divider between them, and kept for the same reason the rest of
   /// this is: switching workspaces should not reset it.
@@ -797,16 +805,19 @@ final class AppModel {
     guard let git else { return }
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     isBusy = true
+    removingWorkspaces.insert(workspace.url)
+    busyLabel = "Removing \(workspace.name)"
+    busyFraction = 0
     defer {
       isBusy = false
       busyLabel = nil
       busyFraction = nil
+      removingWorkspaces.remove(workspace.url)
     }
     do {
       terminals.closeAll(under: workspace.url)
       terminalWorkspaces.remove(workspace.url)
       activeSessions.removeValue(forKey: workspace.url)
-      busyLabel = "Removing \(workspace.name)"
       try await service.teardown(
         workspace: workspace,
         library: library,

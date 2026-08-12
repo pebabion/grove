@@ -50,7 +50,9 @@ struct WorkspaceDetail: View {
       // list holds rows that say "waiting" — and setting up takes minutes, which is too
       // long to leave the window looking like nothing is happening.
       if model.isCreating(workspace) {
-        CreationProgress(workspace: workspace)
+        WorkspaceProgress(workspace: workspace, job: .creating)
+      } else if model.isRemoving(workspace) {
+        WorkspaceProgress(workspace: workspace, job: .removing)
       } else if showingFiles {
         // Files take the place of the repo list rather than sitting over the window:
         // reading one is something you do while working, not instead of it.
@@ -371,6 +373,7 @@ struct StateBadge: View {
     case .pending: "circle.dashed"
     case .settingUp: "circle.dotted"
     case .unknown: nil
+    case .removed: "circle.dashed"
     }
   }
 
@@ -381,6 +384,7 @@ struct StateBadge: View {
     case .pending: .secondary
     case .settingUp: .blue
     case .unknown: .clear
+    case .removed: .secondary
     }
   }
 
@@ -391,6 +395,7 @@ struct StateBadge: View {
     case .pending: "Recorded but not on disk"
     case .settingUp: "Working"
     case .unknown: ""
+    case .removed: "Removed"
     }
   }
 }

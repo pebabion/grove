@@ -124,7 +124,8 @@ struct TeardownProgressTests {
 
   /// A workspace of two repos, and everything it said on the way out.
   private func removalReport(deleteBranches: Bool) async throws -> (
-    steps: [String], phases: [String], repos: [String], fractions: [Double]
+    steps: [String], phases: [String], repos: [String], fractions: [Double],
+    states: [String: RepoState]
   ) {
     let sandbox = try Sandbox()
     let root = sandbox.root.appending(path: "spaces")
@@ -158,7 +159,7 @@ struct TeardownProgressTests {
       onUpdate: { steps.add(update: $0) }, onPhase: { steps.add(phase: $0) })
 
     withExtendedLifetime(sandbox) {}
-    return (steps.details, steps.phases, steps.repos, steps.fractions)
+    return (steps.details, steps.phases, steps.repos, steps.fractions, steps.lastStates)
   }
 
   /// Collects what arrives from another task without racing.
@@ -168,11 +169,13 @@ struct TeardownProgressTests {
     private var _phases: [String] = []
     private var _fractions: [Double] = []
     private var _repos: [String] = []
+    private var _states: [String: RepoState] = [:]
 
     func add(update: ProvisionUpdate) {
       lock.withLock {
         if let detail = update.detail { _details.append(detail) }
         _repos.append(update.repo)
+        _states[update.repo] = update.state
       }
     }
     func add(phase: WorkOutline) {
@@ -186,6 +189,8 @@ struct TeardownProgressTests {
     var phases: [String] { lock.withLock { _phases } }
     var fractions: [Double] { lock.withLock { _fractions } }
     var repos: [String] { lock.withLock { _repos } }
+    /// Where each repo was left, which is the state a row draws itself from.
+    var lastStates: [String: RepoState] { lock.withLock { _states } }
   }
 
   @Test("names each step rather than covering them with one line")
@@ -225,6 +230,15 @@ struct TeardownProgressTests {
     #expect(report.phases.contains("Removing the workspace folder"))
     // The last word is that it is done, which is what takes the bar to the end.
     #expect(report.phases.last == "Removed doomed")
+  }
+
+  @Test("a removed repo does not look like one that has not started")
+  func removedIsItsOwnState() async throws {
+    // Both are repos with nothing on disk. Reported as `pending`, a finished repo drew
+    // the same row as a queued one, so a teardown looked like it had done nothing.
+    let report = try await removalReport(deleteBranches: false)
+    #expect(report.states["backend"] == .removed)
+    #expect(report.states["frontend"] == .removed)
   }
 
   @Test("every repo is accounted for")

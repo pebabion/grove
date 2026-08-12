@@ -302,6 +302,12 @@ public enum RepoState: String, Codable, Sendable, Hashable {
   case failed
   /// Worktree exists and Grove has no record of setup, e.g. adopted from disk.
   case unknown
+  /// Its worktree has been removed.
+  ///
+  /// Distinct from `pending`, which is also a repo with nothing on disk. A teardown that
+  /// reported `pending` when it finished with a repo could not be told apart from one
+  /// that had not started on it, so a removed repo and a queued one looked the same.
+  case removed
 }
 
 /// Grove's metadata file, written to `grove.json` in the workspace root.

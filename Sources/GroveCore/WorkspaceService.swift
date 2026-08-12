@@ -429,7 +429,7 @@ public struct WorkspaceService: Sendable {
 
     onUpdate(
       ProvisionUpdate(
-        repo: member.repoName, state: .pending,
+        repo: member.repoName, state: .removed,
         detail: deleteBranch ? "Removed, with its branch" : "Removed, branch kept"))
   }
 
