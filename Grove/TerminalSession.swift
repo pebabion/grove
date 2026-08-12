@@ -224,7 +224,10 @@ final class TerminalSessions {
     in workspace: URL, directory: URL, fallbackName: String,
     environment: [String: String], font: NSFont, foreground: NSColor, mouseReporting: Bool
   ) -> TerminalSession? {
-    guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
+    guard FileManager.default.fileExists(atPath: directory.path) else {
+      Log.sessions.problem("no session: \(directory.path) does not exist")
+      return nil
+    }
 
     let session = TerminalSession(
       workspace: workspace,
@@ -236,7 +239,8 @@ final class TerminalSessions {
       foreground: foreground,
       mouseReporting: mouseReporting
     )
-    session.onExit = { [weak self, id = session.id] in
+    session.onExit = { [weak self, id = session.id, name = fallbackName] in
+      Log.sessions.note("\(name) exited on its own")
       self?.sessions.removeAll { $0.id == id }
     }
     // Weak on both sides: the session holds this closure, so capturing it strongly
@@ -251,6 +255,7 @@ final class TerminalSessions {
 
   func close(id: UUID) {
     guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+    Log.sessions.note("closing \(sessions[index].displayName) because it was asked for")
     sessions[index].terminate()
     sessions.remove(at: index)
   }
@@ -282,6 +287,7 @@ final class TerminalSessions {
     let prefix = directory.path.hasSuffix("/") ? directory.path : directory.path + "/"
     for session in sessions
     where session.directory.path == directory.path || session.directory.path.hasPrefix(prefix) {
+      Log.sessions.note("closing \(session.displayName): \(directory.lastPathComponent) is going")
       session.terminate()
     }
     sessions.removeAll {

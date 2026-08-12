@@ -120,9 +120,12 @@ struct WorkspaceDetail: View {
         } label: {
           Label("Terminal", systemImage: "apple.terminal")
         }
+        .disabled(model.isCreating(workspace))
         .help(
-          showingTerminal
-            ? "Hide the terminal (⌘ + J)" : "Open a terminal in this workspace (⌘ + J)")
+          model.isCreating(workspace)
+            ? "Available once the workspace is set up"
+            : (showingTerminal
+              ? "Hide the terminal (⌘ + J)" : "Open a terminal in this workspace (⌘ + J)"))
 
         Menu {
           WorkspaceActions(workspace: workspace)

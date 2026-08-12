@@ -476,5 +476,10 @@ conflicting worktree first, which takes a moment.
 
 `TerminalSessions.start` refuses a directory that is not there, and the pane closes itself
 when it has no sessions, so the two together looked exactly like a terminal being killed on
-open. Starting a session now waits for the folder to appear, bounded at a minute, and the
-pane says it is waiting rather than closing.
+open. **The terminal is therefore refused for the length of the creation**, with the button
+disabled and the pane saying why. Waiting for the folder to appear was tried first and was
+not enough: the folder is only the first of the things that are not ready.
+
+**Every way a session can end says so in the log** — asked to close, closed because its
+worktree is going, or the shell exiting on its own. Sessions ending silently is what made
+this take three rounds to find.

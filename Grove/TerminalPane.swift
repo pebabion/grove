@@ -38,12 +38,14 @@ struct TerminalPane: View {
     .task(id: sessions.isEmpty) {
       // One session to begin with, in the workspace root. Starting from the body
       // would resurrect a shell the moment it exited.
-      if sessions.isEmpty { model.startSession(in: workspace, at: workspace.url) }
+      if sessions.isEmpty, !model.isCreating(workspace) {
+        model.startSession(in: workspace, at: workspace.url)
+      }
     }
     .onChange(of: sessions.count) { _, count in
       // Not while a session is waiting for the workspace to exist: closing then is what
       // made a terminal opened during creation look as though it had been killed.
-      if count == 0, !model.awaitingDirectory.contains(workspace.url) { showing = false }
+      if count == 0, !model.isCreating(workspace) { showing = false }
     }
   }
 
@@ -115,10 +117,10 @@ struct TerminalPane: View {
         .id(session.id)
         .padding(10)
         .background(Color(nsColor: session.view.nativeBackgroundColor))
-    } else if model.awaitingDirectory.contains(workspace.url) {
+    } else if model.isCreating(workspace) {
       VStack(spacing: 6) {
         ProgressView().controlSize(.small)
-        Text("Waiting for the workspace to be created")
+        Text("Setting the workspace up first")
           .font(.caption)
           .foregroundStyle(.secondary)
       }

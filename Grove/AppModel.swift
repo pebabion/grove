@@ -72,12 +72,16 @@ final class AppModel {
   /// not undo what you were reading.
   var fileWorkspaces: Set<URL> = []
 
-  /// Workspaces whose terminal is waiting for the folder to exist.
+  /// Workspaces being created right now.
   ///
-  /// A workspace appears in the list before it has been made — that is deliberate, so the
-  /// progress has somewhere to show — which means a terminal can be opened on a folder that
-  /// is not there yet. It waits rather than refusing.
-  private(set) var awaitingDirectory: Set<URL> = []
+  /// They are in the list before they exist on disk, so that progress has somewhere to
+  /// show. Until the work finishes there is nothing to open a terminal on: the folder may
+  /// not be there, the worktrees are arriving one at a time, and setup is still running.
+  private(set) var creatingWorkspaces: Set<URL> = []
+
+  func isCreating(_ workspace: Workspace) -> Bool {
+    creatingWorkspaces.contains(workspace.url)
+  }
 
   /// How tall the terminal pane is when it shares the window with the repo list.
   /// Dragged by the divider between them, and kept for the same reason the rest of
@@ -243,41 +247,16 @@ final class AppModel {
 
   /// Starts a session in `directory` and brings it to the front.
   ///
-  /// If the directory is not there yet — a workspace still being created — this waits for
-  /// it instead of quietly doing nothing. Doing nothing looked like the terminal being
-  /// killed: the pane opened, found no session, and closed itself again.
+  /// Refused while the workspace is being created: the folder may not exist yet, the
+  /// worktrees arrive one at a time and setup is still running, so a shell opened then is
+  /// in a place that is still changing under it.
   @discardableResult
   func startSession(in workspace: Workspace, at directory: URL) -> TerminalSession? {
-    guard FileManager.default.fileExists(atPath: directory.path) else {
-      waitForDirectory(directory, in: workspace)
+    guard !isCreating(workspace) else {
+      Log.sessions.note("not starting a session: \(workspace.name) is still being created")
       return nil
     }
     return startSessionNow(in: workspace, at: directory)
-  }
-
-  /// Waits for a directory to appear, then starts the session there.
-  ///
-  /// Bounded: a directory that never arrives means the creation failed, and a terminal
-  /// waiting for ever would be its own puzzle.
-  private func waitForDirectory(_ directory: URL, in workspace: Workspace) {
-    guard !awaitingDirectory.contains(workspace.url) else { return }
-    awaitingDirectory.insert(workspace.url)
-    Log.sessions.note("waiting for \(directory.lastPathComponent) before starting a session")
-
-    Task { @MainActor [weak self] in
-      for _ in 0..<300 {
-        try? await Task.sleep(for: .milliseconds(200))
-        guard let self, awaitingDirectory.contains(workspace.url) else { return }
-        guard FileManager.default.fileExists(atPath: directory.path) else { continue }
-
-        awaitingDirectory.remove(workspace.url)
-        Log.sessions.note("\(directory.lastPathComponent) arrived, starting a session")
-        startSessionNow(in: workspace, at: directory)
-        return
-      }
-      self?.awaitingDirectory.remove(workspace.url)
-      Log.sessions.problem("gave up waiting for \(directory.lastPathComponent)")
-    }
   }
 
   @discardableResult
@@ -361,6 +340,7 @@ final class AppModel {
   /// terminal first if it is closed, since a session nobody can see is not much use.
   func newSession() {
     guard let workspace = selectedWorkspace else { return }
+    guard !isCreating(workspace) else { return }
     terminalWorkspaces.insert(workspace.url)
     let directory = activeSession(in: workspace)?.directory ?? workspace.url
     startSession(in: workspace, at: directory)
@@ -372,6 +352,9 @@ final class AppModel {
   /// including the terminal itself.
   func toggleTerminal() {
     guard let workspace = selectedWorkspace else { return }
+    // Nothing to open while it is being made, and a pane that opens and shuts is worse
+    // than a shortcut that waits its turn.
+    guard !isCreating(workspace) else { return }
 
     guard terminalWorkspaces.contains(workspace.url) else {
       terminalWorkspaces.insert(workspace.url)
@@ -678,6 +661,7 @@ final class AppModel {
     workspaces.append(placeholder)
     sortWorkspaces()
     selection = expected
+    creatingWorkspaces.insert(expected)
 
     isBusy = true
     busyLabel = "Creating \(WorkspaceNaming.slug(name))"
@@ -685,6 +669,7 @@ final class AppModel {
       isBusy = false
       busyLabel = nil
       busyFraction = nil
+      creatingWorkspaces.remove(expected)
     }
 
     do {
