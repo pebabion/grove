@@ -97,7 +97,7 @@ public struct WorkspaceService: Sendable {
     guard !slug.isEmpty else { throw WorkspaceError.emptyName }
     guard !repos.isEmpty else { throw WorkspaceError.noRepos }
 
-    let workspace = root.appending(path: slug)
+    let workspace = root.appending(path: slug).identity
     if FileManager.default.fileExists(atPath: workspace.path) {
       throw WorkspaceError.nameTaken(slug)
     }

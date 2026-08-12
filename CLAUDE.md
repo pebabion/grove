@@ -483,3 +483,18 @@ not enough: the folder is only the first of the things that are not ready.
 **Every way a session can end says so in the log** — asked to close, closed because its
 worktree is going, or the shell exiting on its own. Sessions ending silently is what made
 this take three rounds to find.
+
+## A workspace has one URL
+
+`contentsOfDirectory` returns directory URLs with a trailing slash; `appending(path:)` does
+not. The two are **not equal**, and not equal after `standardizedFileURL` either — only
+their `path` strings match. Everything Grove keys on a workspace URL therefore stopped
+matching the moment a rescan replaced a created workspace: the selection, the open terminal,
+the files pane.
+
+`URL.identity` writes one form, and the scanner, `create` and the placeholder all use it.
+`WorkspaceIdentityTests` asserts the URL a scan reports *equals* the one create returned —
+equality, not path equality, because path equality is what hid this.
+
+This is what "the terminal was killed while the workspace was created" actually was: the
+session was keyed to the placeholder URL and the workspace came back with a different one.

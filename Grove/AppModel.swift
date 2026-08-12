@@ -638,7 +638,9 @@ final class AppModel {
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     let root = library.workspaceRootURL
 
-    let expected = root.appending(path: WorkspaceNaming.slug(name))
+    // The same form the scanner will report, so everything keyed on it still matches
+    // once the rescan replaces the placeholder. See URL.identity.
+    let expected = root.appending(path: WorkspaceNaming.slug(name)).identity
 
     // Put the workspace on screen and select it before any of the slow work
     // starts. Creating one runs a fetch, a worktree add and then a dependency

@@ -150,3 +150,60 @@ struct RenameTests {
     }
   }
 }
+
+/// Everything Grove remembers about a workspace — the terminal it has open, the files pane,
+/// which one is selected — is keyed on its URL. So the URL a scan reports has to be the one
+/// creating it returned, and not merely the same place written differently.
+@Suite("a workspace has one URL", .serialized)
+struct WorkspaceIdentityTests {
+  let git = Git()
+  let toolPaths = ToolPaths(searchPaths: ["/usr/bin", "/bin", "/opt/homebrew/bin"])
+
+  @Test("the URL a scan reports equals the one create returned")
+  func scanMatchesCreate() async throws {
+    let sandbox = try Sandbox()
+    let root = sandbox.root.appending(path: "spaces")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let repo = try await sandbox.makeRepository(named: "backend")
+    let library = RepoLibrary(
+      repos: [RepoEntry(name: "backend", path: repo.path, base: "main")],
+      workspaceRoot: root.path)
+
+    let service = WorkspaceService(git: git, toolPaths: toolPaths)
+    let created = try await service.create(
+      name: "test3", branch: "kelvin/test3", link: nil, repos: library.repos,
+      in: root, onUpdate: { _ in })
+
+    let scanned = await WorkspaceScanner(git: git).scan(root: root, library: library)
+    let match = try #require(scanned.first)
+
+    // Equality, not path equality: contentsOfDirectory returns directory URLs with a
+    // trailing slash and appending(path:) does not, and the two are unequal even after
+    // standardizing. That difference lost the selection and the open terminal.
+    #expect(match.url == created, "\(match.url.absoluteString) != \(created.absoluteString)")
+    withExtendedLifetime(sandbox) {}
+  }
+
+  @Test("member URLs are written the same way too")
+  func membersMatch() async throws {
+    let sandbox = try Sandbox()
+    let root = sandbox.root.appending(path: "spaces")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let repo = try await sandbox.makeRepository(named: "backend")
+    let library = RepoLibrary(
+      repos: [RepoEntry(name: "backend", path: repo.path, base: "main")],
+      workspaceRoot: root.path)
+
+    let service = WorkspaceService(git: git, toolPaths: toolPaths)
+    let created = try await service.create(
+      name: "test4", branch: "kelvin/test4", link: nil, repos: library.repos,
+      in: root, onUpdate: { _ in })
+
+    let scanned = await WorkspaceScanner(git: git).scan(root: root, library: library)
+    let member = try #require(scanned.first?.members.first)
+    #expect(member.url == created.appending(path: "backend").identity)
+    withExtendedLifetime(sandbox) {}
+  }
+}

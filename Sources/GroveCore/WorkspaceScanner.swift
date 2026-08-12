@@ -176,11 +176,14 @@ public struct WorkspaceScanner: Sendable {
     // the entry stays visible so it can be retried or dropped.
     for name in file.repos where !members.contains(where: { $0.repoName == name }) {
       members.append(
-        WorkspaceMember(repoName: name, url: directory.appending(path: name), state: .pending)
+        WorkspaceMember(
+          repoName: name, url: directory.appending(path: name).identity, state: .pending)
       )
     }
 
-    return Workspace(url: directory, file: file, members: members)
+    // One form for every workspace URL, or nothing keyed on it will match. See
+    // URL.identity.
+    return Workspace(url: directory.identity, file: file, members: members)
   }
 
   private func member(at url: URL, repoByClone: [String: String]) async -> WorkspaceMember? {
@@ -197,7 +200,7 @@ public struct WorkspaceScanner: Sendable {
 
     return WorkspaceMember(
       repoName: repoName,
-      url: url,
+      url: url.identity,
       branch: try? await git.currentBranch(worktree: url),
       state: .unknown,
       lastCommit: try? await git.lastCommitDate(worktree: url),

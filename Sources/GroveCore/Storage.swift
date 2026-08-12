@@ -47,6 +47,17 @@ extension URL {
   /// `temporaryDirectory` says `/var/…`, and both survive those calls unchanged.
   /// macOS has exactly two of these doubled roots, `/private/var` and
   /// `/private/tmp`, so the shorter spelling is chosen deliberately.
+  /// The same location, written one way.
+  ///
+  /// `contentsOfDirectory` hands back directory URLs with a trailing slash while
+  /// `appending(path:)` does not, and the two are not equal — nor are they equal after
+  /// `standardizedFileURL`. Everything Grove keys on a workspace therefore missed after a
+  /// rescan: the terminal it had open, the files pane, the selection. Measured, not
+  /// guessed at.
+  public var identity: URL {
+    URL(filePath: canonical.path)
+  }
+
   public var canonical: URL {
     let resolved = resolvingSymlinksInPath().standardizedFileURL
     for root in ["/private/var", "/private/tmp"] where resolved.path.hasPrefix(root + "/") {
