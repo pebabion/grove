@@ -498,3 +498,14 @@ equality, not path equality, because path equality is what hid this.
 
 This is what "the terminal was killed while the workspace was created" actually was: the
 session was keyed to the placeholder URL and the workspace came back with a different one.
+
+## Arrow keys carry modifiers nobody pressed
+
+macOS puts `.function` and `.numericPad` on every arrow key event. Comparing the whole
+modifier set against `.command` therefore never matches, which is why ⌘ + ← and ⌘ + → did
+nothing for weeks while ⌘ + Backspace worked. Look at the four modifiers a person types
+with and ignore the rest.
+
+The decision lives in `TerminalKeys` in GroveCore, not in the view, so the combinations can
+be tested without a window. That is the whole reason the rule above is now provable rather
+than remembered.

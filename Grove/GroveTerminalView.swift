@@ -1,4 +1,5 @@
 import AppKit
+import GroveCore
 import SwiftTerm
 
 /// A terminal view that sends the key combinations macOS users expect a terminal
@@ -11,16 +12,6 @@ import SwiftTerm
 /// Ghostty — translate them into sequences readline and TUI programs already
 /// understand, which is what happens here.
 final class GroveTerminalView: LocalProcessTerminalView {
-  private static let returnKeyCode: UInt16 = 36
-
-  /// Only Command, and only these keys. Everything else must pass through, or the
-  /// app's own shortcuts stop working while the terminal has focus.
-  private static let commandTranslations: [UInt16: [UInt8]] = [
-    51: [0x15],  // Backspace → ^U, delete to start of line
-    123: [0x01],  // Left      → ^A, start of line
-    124: [0x05],  // Right     → ^E, end of line
-  ]
-
   private var keyMonitor: Any?
 
   /// Called when the running program rings the bell, which is the one signal that
@@ -109,13 +100,12 @@ final class GroveTerminalView: LocalProcessTerminalView {
   /// responder chain, so it checks that this view is the one being typed into.
   private func installShiftReturnMonitor() {
     keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-      guard let self,
-        window?.firstResponder === self,
-        event.keyCode == Self.returnKeyCode,
-        event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .shift
+      guard let self, window?.firstResponder === self,
+        let bytes = TerminalKeys.bytes(for: Self.chord(from: event)),
+        event.keyCode == TerminalKeys.Key.returnKey.rawValue
       else { return event }
 
-      send([0x1b, 0x0d])
+      send(bytes)
       return nil
     }
   }
@@ -126,13 +116,25 @@ final class GroveTerminalView: LocalProcessTerminalView {
     guard window?.firstResponder === self else {
       return super.performKeyEquivalent(with: event)
     }
-    guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-      let bytes = Self.commandTranslations[event.keyCode]
-    else {
+    guard let bytes = TerminalKeys.bytes(for: Self.chord(from: event)) else {
       return super.performKeyEquivalent(with: event)
     }
 
     send(bytes)
     return true
+  }
+
+  /// Reads the modifiers a person actually pressed.
+  ///
+  /// Not the whole set: macOS puts `.function` and `.numericPad` on every arrow key by
+  /// itself, and comparing the whole set against `.command` is why ⌘ + ← did nothing.
+  private static func chord(from event: NSEvent) -> TerminalKeys.Chord {
+    let flags = event.modifierFlags
+    return TerminalKeys.Chord(
+      key: event.keyCode,
+      command: flags.contains(.command),
+      shift: flags.contains(.shift),
+      option: flags.contains(.option),
+      control: flags.contains(.control))
   }
 }
