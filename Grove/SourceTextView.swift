@@ -213,6 +213,10 @@ struct SourceTextView: NSViewRepresentable {
       width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
     let pane = SourcePane()
+    // Without this the scroll view draws over whatever is above the pane, which took the
+    // file's name and path with it. A plain NSView stopped clipping its subviews by
+    // default in macOS 14, and the text view inside is as tall as the file.
+    pane.clipsToBounds = true
     pane.scroll.drawsBackground = true
     pane.scroll.documentView = text
     pane.scroll.hasVerticalScroller = true

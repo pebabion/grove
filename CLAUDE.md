@@ -356,6 +356,11 @@ clip view and the scroller appears; with it on the two match.
 The paragraph style lives inside the attributed text, so changing the mode re-reads and
 re-colours the file rather than just reconfiguring the view.
 
+**A plain `NSView` must be told to clip.** macOS 14 stopped clipping subviews by default,
+so the pane's scroll view drew up over the file's name and path and the header simply was
+not there. `clipsToBounds = true`. Frames are no help in finding this: they were right the
+whole time, which is why it survived a release.
+
 **The gutter is a plain `NSView`, not an `NSRulerView`.** The ruler cost two bugs: painting
 its background by overriding `draw` hid the file and the header above it, and leaving it
 alone left a seam down the gutter, because a ruler paints its own colour a few shades off
