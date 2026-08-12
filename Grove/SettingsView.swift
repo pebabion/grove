@@ -10,10 +10,16 @@ struct SettingsView: View {
         .tabItem { Label("General", systemImage: "gearshape") }
       TerminalSettings()
         .tabItem { Label("Terminal", systemImage: "apple.terminal") }
+      NotificationSettings()
+        .tabItem { Label("Notifications", systemImage: "bell") }
       ToolSettings()
         .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+      AboutSettings()
+        .tabItem { Label("About", systemImage: "info.circle") }
     }
-    .frame(width: 680, height: 540)
+    // Wider than it was: the repo list and its editor share the first tab, and at 680 the
+    // hook editors had barely room for a command.
+    .frame(width: 780, height: 580)
   }
 }
 
@@ -437,33 +443,6 @@ struct TerminalSettings: View {
 
       Section {
         Toggle(
-          "Tell me when a session is waiting",
-          isOn: Binding(
-            get: { model.notificationsEnabled },
-            set: { model.setNotifications($0) })
-        )
-        if let problem = model.hookError {
-          Text(problem)
-            .font(.caption)
-            .foregroundStyle(.red)
-        }
-      } header: {
-        Text("Notifications")
-      } footer: {
-        Text(
-          "Grove tells you when a session finishes or stops to ask you something, "
-            + "unless you are already looking at it. Either way, a session waiting for "
-            + "you keeps a dot in the sidebar.\n\n"
-            + "Claude Code cannot tell Grove on its own, so this registers a small "
-            + "script in its settings and removes it again when you switch this off. "
-            + "Hooks you already have are left alone, and the file is copied first."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
-
-      Section {
-        Toggle(
           "Send mouse events to programs",
           isOn: Binding(
             get: { model.library.terminalMouseReporting ?? false },
@@ -610,5 +589,140 @@ private struct ToolRow: View {
         model.applyToolOverrides()
       }
     }
+  }
+}
+
+// MARK: - About
+
+/// What this copy of Grove is, and whether there is a newer one.
+///
+/// The update pill only appears when there is something to install, which leaves no way to
+/// ask. Here the question can be asked, and the answer includes "already current" — which
+/// the pill has no way to say.
+struct AboutSettings: View {
+  @Environment(AppModel.self) private var model
+
+  var body: some View {
+    Form {
+      Section {
+        LabeledContent("Version", value: model.currentVersion)
+
+        if let update = model.availableUpdate {
+          LabeledContent("Update") {
+            HStack(spacing: 8) {
+              Text(update.version.description)
+                .foregroundStyle(.primary)
+              Button(model.updateStage?.rawValue ?? "Install and restart") {
+                Task { await model.installUpdate() }
+              }
+              .controlSize(.small)
+              .disabled(model.isDownloadingUpdate)
+              Link("What's new", destination: update.pageURL)
+                .font(.caption)
+            }
+          }
+        } else {
+          LabeledContent("Update") {
+            HStack(spacing: 8) {
+              Button(model.isCheckingForUpdate ? "Checking…" : "Check now") {
+                Task { await model.checkForUpdateNow() }
+              }
+              .controlSize(.small)
+              .disabled(model.isCheckingForUpdate)
+              Text(status)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      } header: {
+        Text("This copy")
+      } footer: {
+        Text(
+          "Grove checks every five minutes on its own and offers the update in the window. "
+            + "Installing replaces this app and reopens it; nothing is touched until the "
+            + "download has been checked against the published digest."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
+      Section {
+        LabeledContent("Workspaces") {
+          Text(model.library.workspaceRoot)
+            .font(.system(.caption, design: .monospaced))
+            .lineLimit(1)
+            .truncationMode(.head)
+            .textSelection(.enabled)
+        }
+        LabeledContent("Log") {
+          HStack(spacing: 8) {
+            Text("~/Library/Logs/Grove.log")
+              .font(.system(.caption, design: .monospaced))
+              .textSelection(.enabled)
+            Button("Show") { model.revealInFinder(Log.file) }
+              .controlSize(.small)
+          }
+        }
+      } header: {
+        Text("Where things are")
+      } footer: {
+        Text("The log says what Grove did and when, which is the first place to look.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  /// What the last check found, or that none has managed to happen yet.
+  private var status: String {
+    guard let checked = model.lastUpdateCheck else { return "Not checked yet" }
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .full
+    return "Up to date — checked \(formatter.localizedString(for: checked, relativeTo: Date()))"
+  }
+}
+
+// MARK: - Notifications
+
+/// When Grove interrupts you.
+///
+/// Its own tab rather than a section under Terminal: notifications are about what an agent
+/// is doing, not about how the terminal looks, and filed under Terminal they were somewhere
+/// nobody thought to look.
+struct NotificationSettings: View {
+  @Environment(AppModel.self) private var model
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle(
+          "Tell me when a session is waiting",
+          isOn: Binding(
+            get: { model.notificationsEnabled },
+            set: { model.setNotifications($0) })
+        )
+        if let problem = model.hookError {
+          Text(problem)
+            .font(.caption)
+            .foregroundStyle(.red)
+        }
+      } header: {
+        Text("Notifications")
+      } footer: {
+        Text(
+          "Grove tells you when a session finishes or stops to ask you something, "
+            + "unless you are already looking at it. Either way, a session waiting for "
+            + "you keeps a dot in the sidebar.\n\n"
+            + "Claude Code cannot tell Grove on its own, so this registers a small "
+            + "script in its settings and removes it again when you switch this off. "
+            + "Hooks you already have are left alone, and the file is copied first."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+    }
+    .formStyle(.grouped)
   }
 }

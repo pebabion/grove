@@ -37,7 +37,8 @@ enum Log {
     }
   }
 
-  private static let file: URL = {
+  /// Where the log is written, so Settings can offer to show it.
+  static let file: URL = {
     let logs = FileManager.default.homeDirectoryForCurrentUser
       .appending(path: "Library/Logs", directoryHint: .isDirectory)
     try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)

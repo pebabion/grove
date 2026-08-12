@@ -831,15 +831,36 @@ final class AppModel {
     }
   }
 
-  func checkForUpdate() async {
+  /// True while an asked-for check is in flight, so a button can say so.
+  var isCheckingForUpdate = false
+  /// When a check last finished. Nil means Grove has not managed to ask yet, which is
+  /// worth saying rather than implying everything is current.
+  var lastUpdateCheck: Date?
+
+  @discardableResult
+  func checkForUpdate() async -> AvailableUpdate? {
     guard let found = await UpdateChecker().check(against: currentVersion) else {
       // A nil answer covers both "already current" and "could not ask", so it must
       // not clear a pill already on screen — checking every five minutes would
       // otherwise make one network blip look like the update going away.
-      return
+      lastUpdateCheck = Date()
+      return nil
     }
-    guard found.version != dismissedVersion else { return }
+    lastUpdateCheck = Date()
+    guard found.version != dismissedVersion else { return found }
     availableUpdate = found
+    return found
+  }
+
+  /// Checks because someone asked, which means saying what came back.
+  ///
+  /// Also brings back a version waved away earlier: asking for a check is asking about
+  /// every version, including the one dismissed last week.
+  func checkForUpdateNow() async {
+    isCheckingForUpdate = true
+    defer { isCheckingForUpdate = false }
+    dismissedVersion = nil
+    await checkForUpdate()
   }
 
   /// Dismissing hides one particular version, not the pill for five minutes.
