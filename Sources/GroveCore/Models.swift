@@ -105,6 +105,12 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   /// than most terminals and hard to read against a dark background.
   public var terminalForeground: String?
 
+  /// How dark the terminal's background is, as a ``TerminalBackground`` raw value.
+  ///
+  /// Stored as a level rather than a colour: the question is how harsh the screen is,
+  /// and three neutral greys answer it better than a colour wheel.
+  public var terminalBackground: String?
+
   /// Whether to post a notification when a session finishes or asks for input.
   ///
   /// One switch for the whole feature. What it needs underneath — the Claude Code
@@ -167,7 +173,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
   // decoded the same way.
   enum CodingKeys: String, CodingKey {
     case repos, workspaceRoot, editor, editorPath, terminalPath, branchPrefix
-    case terminalFont, terminalFontSize, terminalForeground
+    case terminalFont, terminalFontSize, terminalForeground, terminalBackground
     case notifySessionEvents, terminalMouseReporting, wrapsSourceText, toolOverrides
   }
 
@@ -183,6 +189,7 @@ public struct RepoLibrary: Codable, Sendable, Hashable {
     terminalFont = try container.decodeIfPresent(String.self, forKey: .terminalFont)
     terminalFontSize = try container.decodeIfPresent(Double.self, forKey: .terminalFontSize)
     terminalForeground = try container.decodeIfPresent(String.self, forKey: .terminalForeground)
+    terminalBackground = try container.decodeIfPresent(String.self, forKey: .terminalBackground)
     notifySessionEvents = try container.decodeIfPresent(Bool.self, forKey: .notifySessionEvents)
     terminalMouseReporting = try container.decodeIfPresent(
       Bool.self, forKey: .terminalMouseReporting)

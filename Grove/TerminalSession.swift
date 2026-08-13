@@ -76,7 +76,8 @@ final class TerminalSession: Identifiable {
 
   init(
     workspace: URL, directory: URL, fallbackName: String, environment: [String: String],
-    shell: String, font: NSFont, foreground: NSColor, mouseReporting: Bool
+    shell: String, font: NSFont, foreground: NSColor, background: NSColor,
+    mouseReporting: Bool
   ) {
     self.workspace = workspace
     self.directory = directory
@@ -84,6 +85,9 @@ final class TerminalSession: Identifiable {
     self.view = GroveTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
     self.view.font = font
     self.view.nativeForegroundColor = foreground
+    // SwiftTerm's own default is pure black. Measured against a real session that is 90%
+    // of the pane, and pure black under light text is what makes the glyphs glow.
+    self.view.nativeBackgroundColor = background
     // Off unless asked for. SwiftTerm discards the selection on every chunk of output
     // while this is on, whether or not a program ever asked for the mouse, so leaving
     // it on means text cannot be selected at all.
@@ -222,7 +226,8 @@ final class TerminalSessions {
   @discardableResult
   func start(
     in workspace: URL, directory: URL, fallbackName: String,
-    environment: [String: String], font: NSFont, foreground: NSColor, mouseReporting: Bool
+    environment: [String: String], font: NSFont, foreground: NSColor, background: NSColor,
+    mouseReporting: Bool
   ) -> TerminalSession? {
     guard FileManager.default.fileExists(atPath: directory.path) else {
       Log.sessions.problem("no session: \(directory.path) does not exist")
@@ -236,7 +241,7 @@ final class TerminalSessions {
       environment: environment,
       shell: loginShell,
       font: font,
-      foreground: foreground,
+      foreground: foreground, background: background,
       mouseReporting: mouseReporting
     )
     session.onExit = { [weak self, id = session.id, name = fallbackName] in
@@ -271,6 +276,15 @@ final class TerminalSessions {
 
   func applyForeground(_ color: NSColor) {
     for session in sessions { session.view.nativeForegroundColor = color }
+  }
+
+  func applyBackground(_ color: NSColor) {
+    for session in sessions {
+      session.view.nativeBackgroundColor = color
+      // The view caches what it has drawn, so a colour change alone leaves the old
+      // background behind until something else forces a repaint.
+      session.view.needsDisplay = true
+    }
   }
 
   /// Changes it on the shells already running, so the setting takes effect without

@@ -276,6 +276,7 @@ final class AppModel {
       environment: toolPaths.processEnvironment(),
       font: terminalFont,
       foreground: terminalForeground,
+      background: terminalBackground,
       mouseReporting: library.terminalMouseReporting ?? false
     )
     if let session { selectSession(session) }
@@ -384,6 +385,10 @@ final class AppModel {
     terminals.applyForeground(terminalForeground)
   }
 
+  func applyTerminalBackground() {
+    terminals.applyBackground(terminalBackground)
+  }
+
   func applyTerminalMouseReporting() {
     terminals.applyMouseReporting(library.terminalMouseReporting ?? false)
   }
@@ -391,6 +396,23 @@ final class AppModel {
   /// The colour embedded terminals draw default text in.
   var terminalForeground: NSColor {
     TerminalPalette.color(library.terminalForeground)
+  }
+
+  /// The colour embedded terminals draw behind everything.
+  var terminalBackground: NSColor {
+    TerminalPalette.background(library.terminalBackground)
+  }
+
+  /// The chosen level, for Settings to show as selected.
+  var terminalBackgroundLevel: TerminalBackground {
+    TerminalBackground(stored: library.terminalBackground)
+  }
+
+  /// Contrast between the terminal's text and its background, for Settings to state.
+  var terminalContrastRatio: Double? {
+    Contrast.ratio(
+      library.terminalForeground ?? TerminalPalette.defaultForeground,
+      terminalBackgroundLevel.hex)
   }
 
   /// The font embedded terminals render with.

@@ -1,4 +1,5 @@
 import AppKit
+import GroveCore
 import SwiftUI
 
 /// Terminal text colour.
@@ -8,7 +9,17 @@ import SwiftUI
 /// sets it explicitly rather than inheriting that.
 enum TerminalPalette {
   /// Bright enough to read, short of pure white, which glares.
-  static let defaultForeground = "#E8E8E8"
+  ///
+  /// Softened from #E8E8E8 once the background came off pure black: what other terminals
+  /// ship sits in this range — iTerm2 #DBDBDB, VS Code #CCCCCC — and 11.6:1 against
+  /// charcoal is still well past WCAG's 7:1 for body text.
+  static let defaultForeground = "#D4D4D4"
+
+  /// The background for a stored level.
+  static func background(_ stored: String?) -> NSColor {
+    let level = TerminalBackground(stored: stored)
+    return NSColor(hex: level.hex) ?? .black
+  }
 
   static func color(_ hex: String?) -> NSColor {
     NSColor(hex: hex ?? defaultForeground) ?? NSColor(hex: defaultForeground) ?? .textColor

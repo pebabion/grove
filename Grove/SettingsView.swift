@@ -466,6 +466,22 @@ struct TerminalSettings: View {
       }
 
       Section {
+        Picker(
+          "Background",
+          selection: Binding(
+            get: { model.terminalBackgroundLevel },
+            set: {
+              model.library.terminalBackground = $0.rawValue
+              model.saveLibrary()
+              model.applyTerminalBackground()
+            })
+        ) {
+          ForEach(TerminalBackground.allCases, id: \.self) { level in
+            Text(level.label).tag(level)
+          }
+        }
+        .pickerStyle(.segmented)
+
         ColorPicker(
           "Text",
           selection: Binding(
@@ -477,20 +493,35 @@ struct TerminalSettings: View {
             }),
           supportsOpacity: false
         )
-        Button("Use the default") {
+        Button("Use the defaults") {
           model.library.terminalForeground = nil
+          model.library.terminalBackground = nil
           model.saveLibrary()
           model.applyTerminalForeground()
+          model.applyTerminalBackground()
         }
         .controlSize(.small)
-        .disabled(model.library.terminalForeground == nil)
+        .disabled(
+          model.library.terminalForeground == nil && model.library.terminalBackground == nil)
       } header: {
         Text("Colour")
       } footer: {
-        Text(
-          "Applies to text a program leaves uncoloured. SwiftTerm's own default is a "
-            + "mid-grey, which reads as dim on a dark background."
-        )
+        VStack(alignment: .leading, spacing: 4) {
+          Text(
+            "Light text on pure black glows at the edges of the glyphs, which is what "
+              + "makes a terminal tiring to read for long. Charcoal is far enough off black "
+              + "to stop it. No terminal shipping today defaults to pure black: iTerm2 uses "
+              + "#14191E, VS Code #1F1F1F, Ghostty #282C34."
+          )
+          Text(
+            "Text applies to what a program leaves uncoloured — a shell, git. Claude Code "
+              + "sets its own colours, so only the background reaches it."
+          )
+          if let ratio = model.terminalContrastRatio {
+            // Worth stating rather than implying: this is the number the choice moves.
+            Text(String(format: "Contrast %.1f:1 — WCAG asks 7:1 for body text.", ratio))
+          }
+        }
         .font(.caption)
         .foregroundStyle(.secondary)
       }
@@ -504,7 +535,8 @@ struct TerminalSettings: View {
           .lineLimit(1)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(8)
-          .background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
+          .background(
+            Color(nsColor: model.terminalBackground), in: RoundedRectangle(cornerRadius: 6))
       }
 
     }

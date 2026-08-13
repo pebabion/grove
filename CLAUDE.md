@@ -526,3 +526,31 @@ would stand still through the longest part and read as stuck.
 `RepoState.removed` exists because `pending` was doing two jobs. A repo that has been
 removed and one that has not been started on both have nothing on disk, so a finished
 teardown drew the same row as a queued one and looked like it had done nothing.
+
+## The terminal's background, and why it is not black
+
+Measured off a screenshot of a real session rather than guessed: **90.5% of the terminal
+pane was pure `#000000`**, the text was `#C0C0C0`, and pure white was 0.04% of the pixels.
+So "harsh black and white" was the background, not the text, and lifting it off pure black
+is the whole fix. `TerminalBackground` offers three neutral greys — black `#000000`,
+charcoal `#1C1C1C` (the default), ash `#262626` — and SwiftTerm's own default is pure
+black, which is why Grove now sets one.
+
+Light glyphs on pure black glow at their edges, which is what makes long reading tiring.
+Nothing shipping today defaults to it: **iTerm2 `#14191E` on `#DBDBDB`**, **VS Code Dark
+Modern `#1F1F1F` on `#CCCCCC`**, **Ghostty `#282C34`**. Only Terminal.app's Pro profile
+still does, at `#000000` on `#F4F4F4`. All read from the apps themselves — iTerm's
+`DefaultBookmark.plist`, Terminal.app's bundled `.terminal` profiles, the vendors' own
+theme files — not from articles about them.
+
+**Claude Code sets 24-bit colour, so the ANSI palette is not a lever.** Its blue measured
+`#B1B9FD` and its red `#FF687F`; neither is any entry in SwiftTerm's table, and its body
+grey `#C0C0C0` is not ANSI 7 either. Remapping the palette would change nothing it draws.
+The background is the only thing Grove sets that reaches it — `nativeForegroundColor`
+applies to text a program leaves uncoloured, which for an agent session is almost none of
+it.
+
+`Contrast.ratio` is in GroveCore so the shipped pairings are asserted, not eyeballed: every
+level stays past WCAG's 7:1 against both Grove's default text and Claude Code's grey, the
+levels are ordered harshest to softest, and each is a neutral grey — a cast would tint
+every uncoloured glyph on it.
