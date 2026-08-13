@@ -599,3 +599,43 @@ Three things the framework fights, all found by rendering it:
 
 System controls in this window are restyled rather than tinted — `ApplicationPicker` lives
 only here, so it uses the same buttons as everything else.
+
+## Is typing slow, or does it feel slow?
+
+It was slow, and the cause was the build being handed over. Measured on the real library at
+a 1600x950 pane on a 2x display, replaying the bytes a live Claude Code session sends for one
+keypress:
+
+| | per keystroke |
+| --- | --- |
+| parse the bytes | 0.04 ms |
+| draw, built with optimisation | **2.6 ms** |
+| draw, built without | **13.9 ms** |
+| the same pane at 800x480, optimised | 0.65 ms |
+| pty write → echo read (kernel) | 0.002 ms |
+
+One frame is 16.7ms, so a debug build spends most of a frame drawing every character and
+stutters the moment anything else wants the main thread. `make app` therefore builds Release
+now; `make debug-app` is there for a debugger or a crash log. The DMG has always been
+Release, so an installed Grove was never the slow one.
+
+How to measure it again: capture real keystrokes by running `claude` under a pty and typing
+one character at a time, recording what comes back — 63 bytes, one synchronised-output block
+and about ten escape sequences per keypress. Then replay those bytes into a `TerminalView` in
+an offscreen `NSWindow` (which gives a real backing store at the screen's scale), timing
+`feed` and `display` separately. Nothing about this needs screen-recording permission.
+
+Two things that came out of doing it:
+
+- **A keystroke repaints the whole pane, not the changed row.** Claude Code's prompt is
+  anchored to the bottom, so redrawing it scrolls the viewport and every row moves. That
+  makes the cost scale with window area, which is why a big window feels worse than a small
+  one — 2.6ms against 0.65ms for the same keypress.
+- **Capping `maximumBidiParagraphRows` does nothing for it.** The dirty row does expand to
+  its whole soft-wrapped paragraph, and that looked like the cause; setting the cap to 1
+  changed the timing by 0.02ms. Measured, discarded, not shipped.
+
+`setUseMetal(true)` is public in SwiftTerm 1.16 and per-row cached, and in the harness it
+looks an order of magnitude cheaper — but an offscreen `MTKView` submits its work
+asynchronously, so that number is not honest and it stays unclaimed until it is measured on
+screen.
