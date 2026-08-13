@@ -14,24 +14,32 @@ struct ApplicationPicker: View {
 
   @State private var choosing = false
 
+  /// Lives only in the settings window, so it wears that window's clothes rather than the
+  /// system's: a bordered blue-grey button beside cream text is the one thing that reads as
+  /// having come from somewhere else.
   var body: some View {
-    LabeledContent(title) {
-      HStack(spacing: 8) {
-        if let path, let icon = Self.icon(for: path) {
-          Image(nsImage: icon)
-            .resizable()
-            .frame(width: 16, height: 16)
-        }
-        Text(display)
-          .foregroundStyle(path == nil ? .secondary : .primary)
-          .lineLimit(1)
+    HStack(spacing: 8) {
+      if !title.isEmpty {
+        Text(title)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(SettingsTheme.title)
+      }
+      if let path, let icon = Self.icon(for: path) {
+        Image(nsImage: icon)
+          .resizable()
+          .frame(width: 15, height: 15)
+      }
+      Text(display)
+        .font(.system(size: 12))
+        .foregroundStyle(path == nil ? SettingsTheme.faint : SettingsTheme.detail)
+        .lineLimit(1)
+        .truncationMode(.middle)
 
-        Spacer()
-
-        Button("Choose…") { choose() }
-        if path != nil {
-          Button("Clear") { path = nil }
-        }
+      Button("Choose…") { choose() }
+        .buttonStyle(SettingsButtonStyle())
+      if path != nil {
+        Button("Clear") { path = nil }
+          .buttonStyle(SettingsButtonStyle())
       }
     }
   }

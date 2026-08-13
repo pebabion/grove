@@ -1,26 +1,15 @@
 import GroveCore
 import SwiftUI
 
+/// The settings window.
+///
+/// A sidebar of categories and rows of title, description and control, rather than a
+/// `TabView` of `Form`s. Two things the old shape could not do: say what a setting does
+/// without being asked — a `Form` footer describes a whole section, so half the settings had
+/// no explanation of their own — and be searched, which is the only way to find a setting
+/// whose group you cannot guess.
 struct SettingsView: View {
-  var body: some View {
-    TabView {
-      LibrarySettings()
-        .tabItem { Label("Repos", systemImage: "shippingbox") }
-      GeneralSettings()
-        .tabItem { Label("General", systemImage: "gearshape") }
-      TerminalSettings()
-        .tabItem { Label("Terminal", systemImage: "apple.terminal") }
-      NotificationSettings()
-        .tabItem { Label("Notifications", systemImage: "bell") }
-      ToolSettings()
-        .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
-      AboutSettings()
-        .tabItem { Label("About", systemImage: "info.circle") }
-    }
-    // Wider than it was: the repo list and its editor share the first tab, and at 680 the
-    // hook editors had barely room for a command.
-    .frame(width: 780, height: 580)
-  }
+  var body: some View { SettingsShell() }
 }
 
 // MARK: - Repos
@@ -33,86 +22,45 @@ struct LibrarySettings: View {
   @State private var removing: String?
 
   var body: some View {
-    HSplitView {
+    SettingBlock("library") {
       VStack(spacing: 0) {
-        List(selection: $selection) {
-          ForEach(model.library.repos) { repo in
-            HStack(spacing: 8) {
-              RepoSwatch(repo: repo.name, size: 10)
-              VStack(alignment: .leading, spacing: 1) {
-                Text(repo.name)
-                Text(repo.path)
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-                  .lineLimit(1)
-                  .truncationMode(.head)
-              }
-              Spacer()
-              if !FileManager.default.fileExists(atPath: repo.url.path) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                  .foregroundStyle(.orange)
-                  .help("This clone is no longer at that path")
-              }
-            }
-            .tag(repo.name)
-          }
-        }
-        .overlay {
-          if model.library.repos.isEmpty {
-            VStack(spacing: 4) {
-              Text("No repos").font(.headline)
-              Text("Add a clone to get started.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
+        if model.library.repos.isEmpty {
+          Text("No repos yet. Add a clone to get started.")
+            .font(.system(size: 11.5))
+            .foregroundStyle(SettingsTheme.faint)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 10)
         }
 
-        Divider()
-        HStack(spacing: 2) {
-          Button {
-            showingPicker = true
-          } label: {
-            Image(systemName: "plus")
+        ForEach(model.library.repos) { repo in
+          repoRow(repo)
+          if repo.name != model.library.repos.last?.name {
+            Divider().overlay(SettingsTheme.divider.opacity(0.6))
           }
-          .help("Add a repository")
-
-          Button {
-            removing = selection
-          } label: {
-            Image(systemName: "minus")
-          }
-          .disabled(selection == nil)
-          .help("Remove from the library")
-
-          Spacer()
-          Text("\(model.library.repos.count) repos")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.borderless)
-        .padding(6)
-      }
-      .frame(minWidth: 220, idealWidth: 240)
-
-      Group {
-        if let name = selection, model.library[name] != nil {
-          RepoEditor(name: name)
-        } else {
-          VStack(spacing: 6) {
-            Text("Select a repo")
-              .foregroundStyle(.secondary)
-            Text(
-              "Each one records where its clone is, what to fork from, and how to\nprepare a fresh worktree."
-            )
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            .multilineTextAlignment(.center)
-          }
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
-      .frame(minWidth: 360)
+      .background(RoundedRectangle(cornerRadius: 8).fill(SettingsTheme.surface.opacity(0.5)))
+      .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(SettingsTheme.divider, lineWidth: 1))
+
+      HStack(spacing: 8) {
+        Button("Add a repo…") { showingPicker = true }
+          .buttonStyle(SettingsButtonStyle())
+        if let selection, model.library[selection] != nil {
+          Button("Remove \(selection)") { removing = selection }
+            .buttonStyle(SettingsButtonStyle())
+        }
+        Spacer()
+        Text("\(model.library.repos.count) in the library")
+          .font(.system(size: 11))
+          .foregroundStyle(SettingsTheme.faint)
+      }
+
+      // The editor sits under the list rather than beside it: the pane already scrolls,
+      // and a split view inside it would be a second thing to scroll.
+      if let selection, model.library[selection] != nil {
+        RepoEditor(name: selection)
+          .padding(.top, 4)
+      }
     }
     .fileImporter(isPresented: $showingPicker, allowedContentTypes: [.folder]) { result in
       if case .success(let url) = result {
@@ -140,6 +88,41 @@ struct LibrarySettings: View {
       )
     }
   }
+
+  private func repoRow(_ repo: RepoEntry) -> some View {
+    let chosen = selection == repo.name
+    return Button {
+      selection = chosen ? nil : repo.name
+    } label: {
+      HStack(spacing: 8) {
+        RepoSwatch(repo: repo.name, size: 8)
+        Text(repo.name)
+          .font(.system(size: 12.5, weight: chosen ? .semibold : .regular))
+          .foregroundStyle(SettingsTheme.title)
+        Text(repo.path)
+          .font(.system(size: 11, design: .monospaced))
+          .foregroundStyle(SettingsTheme.faint)
+          .lineLimit(1)
+          .truncationMode(.head)
+        Spacer(minLength: 8)
+        if !FileManager.default.fileExists(atPath: repo.url.path) {
+          Image(systemName: "exclamationmark.triangle.fill")
+            .font(.system(size: 10))
+            .foregroundStyle(SettingsTheme.warning)
+            .help("This clone is no longer at that path")
+        }
+        Image(systemName: chosen ? "chevron.down" : "chevron.right")
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(SettingsTheme.faint)
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 8)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(chosen ? SettingsTheme.selection.opacity(0.6) : .clear)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
 }
 
 /// Editor for one library entry.
@@ -160,77 +143,103 @@ struct RepoEditor: View {
       editor(for: repo)
     } else {
       // Removed while its editor was open. Nothing to edit and nothing to report.
-      Text("This repo is no longer in the library.")
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      SettingNote(text: "This repo is no longer in the library.")
     }
   }
 
   private func editor(for repo: RepoEntry) -> some View {
-    Form {
-      Section {
-        LabeledContent("Name", value: repo.name)
-        LabeledContent("Clone") {
-          HStack {
-            Text(repo.path)
-              .font(.system(.caption, design: .monospaced))
-              .lineLimit(1)
-              .truncationMode(.head)
-              .textSelection(.enabled)
-            Spacer()
-            Button("Reveal") { model.revealInFinder(repo.url) }
-              .controlSize(.small)
-          }
+    VStack(alignment: .leading, spacing: 14) {
+      field("Clone") {
+        HStack(spacing: 8) {
+          Text(repo.path)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(SettingsTheme.detail)
+            .lineLimit(1)
+            .truncationMode(.head)
+            .textSelection(.enabled)
+          Spacer(minLength: 8)
+          Button("Reveal") { model.revealInFinder(repo.url) }
+            .buttonStyle(SettingsButtonStyle())
         }
-        LabeledContent("Base branch") {
-          HStack {
-            TextField("", text: binding(\.base), prompt: Text("origin/main"))
-              .font(.system(.body, design: .monospaced))
-            Button("Detect") {
-              Task { await model.redetectBase(for: repo.name) }
-            }
-            .controlSize(.small)
-            .help("Read it again from the remote's origin/HEAD")
-          }
-        }
-      } footer: {
-        Text("New worktrees fork from the base branch.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
       }
 
-      hookSection(
+      field("Base branch", note: "New worktrees fork from here.") {
+        HStack(spacing: 8) {
+          TextField("", text: binding(\.base), prompt: Text("origin/main"))
+            .textFieldStyle(SettingsFieldStyle())
+            .frame(maxWidth: 220)
+          Button("Detect") {
+            Task { await model.redetectBase(for: repo.name) }
+          }
+          .buttonStyle(SettingsButtonStyle())
+          .help("Read it again from the remote's origin/HEAD")
+          Spacer(minLength: 0)
+        }
+      }
+
+      hook(
         title: "Setup",
         note: "Runs after the worktree is created.",
         script: GroveLocations.setupScriptName,
         text: optionalBinding(\.setupCommand)
       )
 
-      hookSection(
+      hook(
         title: "Teardown",
         note: "Runs before the worktree is removed. Undo anything setup did outside it.",
         script: GroveLocations.teardownScriptName,
         text: optionalBinding(\.teardownCommand)
       )
 
-      Section {
-        DisclosureGroup("Variables a hook receives", isExpanded: $showingVariables) {
-          Text(HookEnvironment.reference)
-            .font(.system(.caption2, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
+      Button {
+        showingVariables.toggle()
+      } label: {
+        HStack(spacing: 5) {
+          Image(systemName: showingVariables ? "chevron.down" : "chevron.right")
+            .font(.system(size: 9, weight: .semibold))
+          Text("Variables a hook receives")
+            .font(.system(size: 11.5))
         }
+        .foregroundStyle(SettingsTheme.detail)
+      }
+      .buttonStyle(.plain)
+
+      if showingVariables {
+        Text(HookEnvironment.reference)
+          .font(.system(size: 10.5, design: .monospaced))
+          .foregroundStyle(SettingsTheme.faint)
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
-    .formStyle(.grouped)
+    .padding(14)
+    .background(RoundedRectangle(cornerRadius: 8).fill(SettingsTheme.surface.opacity(0.35)))
+    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(SettingsTheme.divider, lineWidth: 1))
     // A last write in case the coalesced one has not fired yet.
     .onDisappear { model.saveLibrary() }
   }
 
+  /// One labelled thing inside the editor. Not a `SettingRow`: these belong to the selected
+  /// repo rather than to Grove, so they are not settings to be searched for.
+  private func field<Content: View>(
+    _ label: String, note: String? = nil, @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text(label)
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(SettingsTheme.title)
+      content()
+      if let note {
+        Text(note)
+          .font(.system(size: 11))
+          .foregroundStyle(SettingsTheme.faint)
+      }
+    }
+  }
+
   /// One hook, with a warning when a committed script will win over this command.
   @ViewBuilder
-  private func hookSection(
+  private func hook(
     title: String, note: String, script: String, text: Binding<String>
   ) -> some View {
     let committed = repo?.url
@@ -240,22 +249,22 @@ struct RepoEditor: View {
     let executable =
       committed.map { FileManager.default.isExecutableFile(atPath: $0.path) } ?? false
 
-    Section {
-      TextEditor(text: text)
-        .font(.system(.caption, design: .monospaced))
-        .frame(minHeight: 64)
-        .padding(4)
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
-      if text.wrappedValue.isEmpty {
-        Text("Nothing runs for this repo.")
-          .font(.caption)
-          .foregroundStyle(.tertiary)
-      }
-    } header: {
-      Text(title)
-    } footer: {
-      VStack(alignment: .leading, spacing: 4) {
-        Text(note)
+    field(title, note: note) {
+      VStack(alignment: .leading, spacing: 5) {
+        TextEditor(text: text)
+          .font(.system(size: 11, design: .monospaced))
+          .scrollContentBackground(.hidden)
+          .foregroundStyle(SettingsTheme.title)
+          .frame(minHeight: 52)
+          .padding(6)
+          .background(RoundedRectangle(cornerRadius: 6).fill(SettingsTheme.background))
+          .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SettingsTheme.divider))
+
+        if text.wrappedValue.isEmpty {
+          Text("Nothing runs for this repo.")
+            .font(.system(size: 11))
+            .foregroundStyle(SettingsTheme.faint)
+        }
         // The resolver prefers a committed script, so a command typed here can be
         // silently dead. Worth saying out loud, including the not-executable case.
         if exists, executable {
@@ -263,16 +272,17 @@ struct RepoEditor: View {
             "This clone commits .grove/\(script), which runs instead of the above.",
             systemImage: "exclamationmark.triangle"
           )
-          .foregroundStyle(.orange)
+          .font(.system(size: 11))
+          .foregroundStyle(SettingsTheme.warning)
         } else if exists {
           Label(
             ".grove/\(script) exists but is not executable, so the command above runs.",
             systemImage: "info.circle"
           )
+          .font(.system(size: 11))
+          .foregroundStyle(SettingsTheme.detail)
         }
       }
-      .font(.caption)
-      .foregroundStyle(.secondary)
     }
   }
 
@@ -304,82 +314,22 @@ struct GeneralSettings: View {
   @State private var showingPicker = false
 
   var body: some View {
-    Form {
-      Section {
-        LabeledContent("Workspace root") {
-          HStack {
-            Text(model.library.workspaceRoot)
-              .font(.system(.caption, design: .monospaced))
-              .lineLimit(1)
-              .truncationMode(.head)
-            if !FileManager.default.fileExists(atPath: model.library.workspaceRootURL.path) {
-              Text("will be created")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button("Choose…") { showingPicker = true }
-              .controlSize(.small)
-          }
+    SettingRow("workspaceRoot", controlWidth: 300) {
+      HStack(spacing: 8) {
+        Text(model.library.workspaceRoot)
+          .font(.system(size: 11, design: .monospaced))
+          .foregroundStyle(SettingsTheme.detail)
+          .lineLimit(1)
+          .truncationMode(.head)
+        if !FileManager.default.fileExists(atPath: model.library.workspaceRootURL.path) {
+          Text("will be created")
+            .font(.system(size: 10))
+            .foregroundStyle(SettingsTheme.faint)
         }
-      } footer: {
-        Text("Where workspace folders are created.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-
-      Section {
-        TextField(
-          "Branch prefix",
-          text: Binding(
-            get: { model.library.branchPrefix ?? "" },
-            set: {
-              model.library.branchPrefix = $0.isEmpty ? nil : $0
-              model.saveLibrarySoon()
-            }),
-          prompt: Text("ada — or leave it empty")
-        )
-        .font(.system(.body, design: .monospaced))
-      } footer: {
-        Text(
-          model.library.branchPrefix?.isEmpty == false
-            ? "A workspace called Fix Search gets \(model.library.suggestedBranch(for: "Fix Search"))."
-            : "A workspace called Fix Search gets fix-search."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
-
-      Section {
-        ApplicationPicker(
-          title: "Open with",
-          fallback: "Finder",
-          path: Binding(
-            get: { model.library.editorPath },
-            set: {
-              model.library.editorPath = $0
-              model.saveLibrary()
-            })
-        )
-        ApplicationPicker(
-          title: "Terminal",
-          fallback: "Terminal",
-          path: Binding(
-            get: { model.library.terminalPath },
-            set: {
-              model.library.terminalPath = $0
-              model.saveLibrary()
-            })
-        )
-      } header: {
-        Text("Opening")
-      } footer: {
-        Text("The Open button hands the workspace folder to this application.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Button("Choose…") { showingPicker = true }
+          .buttonStyle(SettingsButtonStyle())
       }
     }
-    .formStyle(.grouped)
     .fileImporter(isPresented: $showingPicker, allowedContentTypes: [.folder]) { result in
       if case .success(let url) = result {
         let home = NSHomeDirectory()
@@ -389,6 +339,56 @@ struct GeneralSettings: View {
         model.saveLibrary()
         Task { await model.rescan() }
       }
+    }
+
+    SettingRow("branchPrefix") {
+      VStack(alignment: .trailing, spacing: 4) {
+        TextField(
+          "",
+          text: Binding(
+            get: { model.library.branchPrefix ?? "" },
+            set: {
+              model.library.branchPrefix = $0.isEmpty ? nil : $0
+              model.saveLibrarySoon()
+            }),
+          prompt: Text("ada — or leave it empty")
+        )
+        .textFieldStyle(SettingsFieldStyle())
+        // Worth showing rather than describing: the answer depends on what is typed.
+        Text(
+          model.library.branchPrefix?.isEmpty == false
+            ? model.library.suggestedBranch(for: "Fix Search")
+            : "fix-search"
+        )
+        .font(.system(size: 10.5, design: .monospaced))
+        .foregroundStyle(SettingsTheme.faint)
+      }
+    }
+
+    SettingRow("editorApp") {
+      ApplicationPicker(
+        title: "",
+        fallback: "Finder",
+        path: Binding(
+          get: { model.library.editorPath },
+          set: {
+            model.library.editorPath = $0
+            model.saveLibrary()
+          })
+      )
+    }
+
+    SettingRow("terminalApp") {
+      ApplicationPicker(
+        title: "",
+        fallback: "Terminal",
+        path: Binding(
+          get: { model.library.terminalPath },
+          set: {
+            model.library.terminalPath = $0
+            model.saveLibrary()
+          })
+      )
     }
   }
 }
@@ -401,89 +401,55 @@ struct TerminalSettings: View {
   private var size: Double { model.library.terminalFontSize ?? TerminalFont.defaultSize }
 
   var body: some View {
-    Form {
-      Section {
-        Picker(
-          "Font",
-          selection: Binding(
-            get: { TerminalFont.resolve(model.library.terminalFont) },
-            set: {
-              model.library.terminalFont = $0
-              model.saveLibrary()
-              model.applyTerminalFont()
-            })
-        ) {
-          ForEach(TerminalFont.monospacedFamilies, id: \.self) { family in
-            Text(family).tag(family)
-          }
+    SettingRow("terminalFont") {
+      SettingsPicker(
+        selection: Binding(
+          get: { TerminalFont.resolve(model.library.terminalFont) },
+          set: {
+            model.library.terminalFont = $0
+            model.saveLibrary()
+            model.applyTerminalFont()
+          }),
+        options: TerminalFont.monospacedFamilies.map { ($0, $0) }
+      )
+    }
+
+    SettingRow("terminalFontSize") {
+      HStack(spacing: 8) {
+        Text("\(Int(size)) pt")
+          .font(.system(size: 12, design: .monospaced))
+          .foregroundStyle(SettingsTheme.title)
+        HStack(spacing: 2) {
+          stepButton("minus", enabled: size > 9) { setSize(size - 1) }
+          stepButton("plus", enabled: size < 24) { setSize(size + 1) }
         }
-
-        Stepper(
-          "Size: \(Int(size)) pt",
-          value: Binding(
-            get: { size },
-            set: {
-              model.library.terminalFontSize = $0
-              model.saveLibrary()
-              model.applyTerminalFont()
-            }),
-          in: 9...24,
-          step: 1
-        )
-      } header: {
-        Text("Font")
-      } footer: {
-        Text(
-          "A prompt built from Nerd Font glyphs needs a font that has them, or macOS "
-            + "substitutes them one at a time and the sizes stop matching."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
       }
+    }
 
-      Section {
-        Toggle(
-          "Send mouse events to programs",
-          isOn: Binding(
-            get: { model.library.terminalMouseReporting ?? false },
-            set: {
-              model.library.terminalMouseReporting = $0
-              model.saveLibrary()
-              model.applyTerminalMouseReporting()
-            })
-        )
-      } header: {
-        Text("Mouse")
-      } footer: {
-        Text(
-          "Leave this off to select text. SwiftTerm throws the selection away on every "
-            + "chunk of output while mouse events are being sent, so a selection lasts "
-            + "only until the next line prints. Turn it on for programs that read the "
-            + "mouse themselves, such as vim or lazygit — Claude Code does not."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
+    SettingRow("terminalBackground", controlWidth: 260) {
+      SettingsSegments(
+        selection: Binding(
+          get: { model.terminalBackgroundLevel },
+          set: {
+            model.library.terminalBackground = $0.rawValue
+            model.saveLibrary()
+            model.applyTerminalBackground()
+          }),
+        options: TerminalBackground.allCases.map { ($0, $0.label) }
+      )
+    }
 
-      Section {
-        Picker(
-          "Background",
-          selection: Binding(
-            get: { model.terminalBackgroundLevel },
-            set: {
-              model.library.terminalBackground = $0.rawValue
-              model.saveLibrary()
-              model.applyTerminalBackground()
-            })
-        ) {
-          ForEach(TerminalBackground.allCases, id: \.self) { level in
-            Text(level.label).tag(level)
-          }
+    SettingRow("terminalForeground") {
+      HStack(spacing: 8) {
+        if let ratio = model.terminalContrastRatio {
+          // The number the two colours together produce, and what it has to clear.
+          Text(String(format: "%.1f:1", ratio))
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(ratio >= 7 ? SettingsTheme.faint : SettingsTheme.warning)
+            .help("WCAG asks 7:1 for body text")
         }
-        .pickerStyle(.segmented)
-
         ColorPicker(
-          "Text",
+          "",
           selection: Binding(
             get: { Color(nsColor: model.terminalForeground) },
             set: {
@@ -493,54 +459,100 @@ struct TerminalSettings: View {
             }),
           supportsOpacity: false
         )
-        Button("Use the defaults") {
+        .labelsHidden()
+        Button("Reset") {
           model.library.terminalForeground = nil
           model.library.terminalBackground = nil
           model.saveLibrary()
           model.applyTerminalForeground()
           model.applyTerminalBackground()
         }
-        .controlSize(.small)
+        .buttonStyle(SettingsButtonStyle())
         .disabled(
           model.library.terminalForeground == nil && model.library.terminalBackground == nil)
-      } header: {
-        Text("Colour")
-      } footer: {
-        VStack(alignment: .leading, spacing: 4) {
-          Text(
-            "Light text on pure black glows at the edges of the glyphs, which is what "
-              + "makes a terminal tiring to read for long. Charcoal is far enough off black "
-              + "to stop it. No terminal shipping today defaults to pure black: iTerm2 uses "
-              + "#14191E, VS Code #1F1F1F, Ghostty #282C34."
-          )
-          Text(
-            "Text applies to what a program leaves uncoloured — a shell, git. Claude Code "
-              + "sets its own colours, so only the background reaches it."
-          )
-          if let ratio = model.terminalContrastRatio {
-            // Worth stating rather than implying: this is the number the choice moves.
-            Text(String(format: "Contrast %.1f:1 — WCAG asks 7:1 for body text.", ratio))
-          }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
       }
-
-      // Worth showing rather than describing: the list has hundreds of families and
-      // their names say nothing about whether the glyphs are there.
-      Section("Preview") {
-        Text(verbatim: "❯ git status  ~/code/grove  \u{ea71} main \u{f00c} ✔ 42%")
-          .font(Font(model.terminalFont))
-          .foregroundStyle(Color(nsColor: model.terminalForeground))
-          .lineLimit(1)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(8)
-          .background(
-            Color(nsColor: model.terminalBackground), in: RoundedRectangle(cornerRadius: 6))
-      }
-
     }
-    .formStyle(.grouped)
+
+    SettingRow("terminalMouse") {
+      Toggle(
+        "",
+        isOn: Binding(
+          get: { model.library.terminalMouseReporting ?? false },
+          set: {
+            model.library.terminalMouseReporting = $0
+            model.saveLibrary()
+            model.applyTerminalMouseReporting()
+          })
+      )
+      .toggleStyle(SettingsToggleStyle())
+      .labelsHidden()
+    }
+
+    // Worth showing rather than describing: the font list has hundreds of families and
+    // their names say nothing about whether the glyphs are there.
+    Text(verbatim: "❯ git status  ~/code/grove  \u{ea71} main \u{f00c} ✔ 42%")
+      .font(Font(model.terminalFont))
+      .foregroundStyle(Color(nsColor: model.terminalForeground))
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(10)
+      .background(
+        RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: model.terminalBackground))
+      )
+      .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SettingsTheme.divider))
+      .padding(.top, 14)
+  }
+
+  private func setSize(_ value: Double) {
+    model.library.terminalFontSize = value
+    model.saveLibrary()
+    model.applyTerminalFont()
+  }
+
+  private func stepButton(
+    _ symbol: String, enabled: Bool, action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      Image(systemName: symbol)
+        .font(.system(size: 9, weight: .semibold))
+        .frame(width: 18, height: 18)
+    }
+    .buttonStyle(SettingsButtonStyle())
+    .disabled(!enabled)
+    .opacity(enabled ? 1 : 0.4)
+  }
+}
+
+// MARK: - Notifications
+
+/// When Grove interrupts you.
+///
+/// Its own category rather than a section under Terminal: notifications are about what an
+/// agent is doing, not about how the terminal looks, and filed under Terminal they were
+/// somewhere nobody thought to look.
+struct NotificationSettings: View {
+  @Environment(AppModel.self) private var model
+
+  var body: some View {
+    SettingRow("notify") {
+      Toggle(
+        "", isOn: Binding(get: { model.notificationsEnabled }, set: { model.setNotifications($0) })
+      )
+      .toggleStyle(SettingsToggleStyle())
+      .labelsHidden()
+    }
+
+    if let problem = model.hookError {
+      SettingNote(text: problem, tint: SettingsTheme.danger)
+        .padding(.top, 4)
+    }
+
+    SettingNote(
+      text: "Claude Code cannot tell Grove on its own, so this registers a small script in "
+        + "its settings and removes it again when you switch this off. Hooks you already "
+        + "have are left alone, and the file is copied first."
+    )
+    .padding(.top, 10)
   }
 }
 
@@ -550,28 +562,22 @@ struct ToolSettings: View {
   @Environment(AppModel.self) private var model
 
   var body: some View {
-    Form {
-      Section {
-        ForEach(model.toolPaths.inventory(), id: \.tool) { entry in
+    SettingBlock("toolPaths") {
+      VStack(spacing: 0) {
+        let inventory = model.toolPaths.inventory()
+        ForEach(inventory, id: \.tool) { entry in
           ToolRow(tool: entry.tool, resolved: entry.path)
+          if entry.tool != inventory.last?.tool {
+            Divider().overlay(SettingsTheme.divider.opacity(0.6))
+          }
         }
-      } header: {
-        Text("Resolved from a login shell")
-      } footer: {
-        Text(
-          "An app launched from Finder inherits almost no PATH, so Grove asks your "
-            + "login shell where these live. Point one at a path yourself if it is "
-            + "somewhere unusual. Only git is required."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
       }
+      .background(RoundedRectangle(cornerRadius: 8).fill(SettingsTheme.surface.opacity(0.5)))
+      .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(SettingsTheme.divider, lineWidth: 1))
 
-      Section {
-        Button("Search again") { Task { await model.reloadToolPaths() } }
-      }
+      Button("Search again") { Task { await model.reloadToolPaths() } }
+        .buttonStyle(SettingsButtonStyle())
     }
-    .formStyle(.grouped)
   }
 }
 
@@ -586,33 +592,38 @@ private struct ToolRow: View {
   private var isOverridden: Bool { model.library.toolOverrides[tool] != nil }
 
   var body: some View {
-    LabeledContent(tool) {
-      HStack(spacing: 8) {
-        Image(systemName: resolved == nil ? "xmark.circle" : "checkmark.circle.fill")
-          .foregroundStyle(resolved == nil ? Color.secondary : Color.green)
-        Text(resolved ?? "not found")
-          .font(.system(.caption, design: .monospaced))
-          .foregroundStyle(resolved == nil ? .secondary : .primary)
-          .lineLimit(1)
-          .truncationMode(.head)
-        if isOverridden {
-          Text("set by you")
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+    HStack(spacing: 8) {
+      Image(systemName: resolved == nil ? "xmark.circle" : "checkmark.circle.fill")
+        .font(.system(size: 10))
+        .foregroundStyle(resolved == nil ? SettingsTheme.faint : SettingsTheme.confirm)
+      Text(tool)
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(SettingsTheme.title)
+        .frame(width: 54, alignment: .leading)
+      Text(resolved ?? "not found")
+        .font(.system(size: 11, design: .monospaced))
+        .foregroundStyle(resolved == nil ? SettingsTheme.faint : SettingsTheme.detail)
+        .lineLimit(1)
+        .truncationMode(.head)
+      if isOverridden {
+        Text("set by you")
+          .font(.system(size: 10))
+          .foregroundStyle(SettingsTheme.faint)
+      }
+      Spacer(minLength: 8)
+      Button("Choose…") { choosing = true }
+        .buttonStyle(SettingsButtonStyle())
+      if isOverridden {
+        Button("Clear") {
+          model.library.toolOverrides.removeValue(forKey: tool)
+          model.saveLibrary()
+          model.applyToolOverrides()
         }
-        Spacer()
-        Button("Choose…") { choosing = true }
-          .controlSize(.small)
-        if isOverridden {
-          Button("Clear") {
-            model.library.toolOverrides.removeValue(forKey: tool)
-            model.saveLibrary()
-            model.applyToolOverrides()
-          }
-          .controlSize(.small)
-        }
+        .buttonStyle(SettingsButtonStyle())
       }
     }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 7)
     .fileImporter(isPresented: $choosing, allowedContentTypes: [.unixExecutable, .executable]) {
       result in
       if case .success(let url) = result {
@@ -635,126 +646,70 @@ struct AboutSettings: View {
   @Environment(AppModel.self) private var model
 
   var body: some View {
-    Form {
-      Section {
-        LabeledContent("Version", value: model.currentVersion)
+    SettingRow("version", controlWidth: 300) {
+      HStack(spacing: 8) {
+        Text(model.currentVersion)
+          .font(.system(size: 12, design: .monospaced))
+          .foregroundStyle(SettingsTheme.title)
 
         if let update = model.availableUpdate {
-          LabeledContent("Update") {
-            HStack(spacing: 8) {
-              Text(update.version.description)
-                .foregroundStyle(.primary)
-              Button(model.updateStage?.rawValue ?? "Install and restart") {
-                Task { await model.installUpdate() }
-              }
-              .controlSize(.small)
-              .disabled(model.isDownloadingUpdate)
-              Link("What's new", destination: update.pageURL)
-                .font(.caption)
-            }
+          Text("→ \(update.version.description)")
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(SettingsTheme.confirm)
+          Button(model.updateStage?.rawValue ?? "Install and restart") {
+            Task { await model.installUpdate() }
           }
+          .buttonStyle(SettingsButtonStyle(prominent: true))
+          .disabled(model.isDownloadingUpdate)
+          Link("What's new", destination: update.pageURL)
+            .font(.system(size: 11))
+            .foregroundStyle(SettingsTheme.detail)
         } else {
-          LabeledContent("Update") {
-            HStack(spacing: 8) {
-              Button(model.isCheckingForUpdate ? "Checking…" : "Check now") {
-                Task { await model.checkForUpdateNow() }
-              }
-              .controlSize(.small)
-              .disabled(model.isCheckingForUpdate)
-              Text(status)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
+          Button(model.isCheckingForUpdate ? "Checking…" : "Check now") {
+            Task { await model.checkForUpdateNow() }
           }
+          .buttonStyle(SettingsButtonStyle())
+          .disabled(model.isCheckingForUpdate)
         }
-      } header: {
-        Text("This copy")
-      } footer: {
-        Text(
-          "Grove checks every five minutes on its own and offers the update in the window. "
-            + "Installing replaces this app and reopens it; nothing is touched until the "
-            + "download has been checked against the published digest."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
-
-      Section {
-        LabeledContent("Workspaces") {
-          Text(model.library.workspaceRoot)
-            .font(.system(.caption, design: .monospaced))
-            .lineLimit(1)
-            .truncationMode(.head)
-            .textSelection(.enabled)
-        }
-        LabeledContent("Log") {
-          HStack(spacing: 8) {
-            Text("~/Library/Logs/Grove.log")
-              .font(.system(.caption, design: .monospaced))
-              .textSelection(.enabled)
-            Button("Show") { model.revealInFinder(Log.file) }
-              .controlSize(.small)
-          }
-        }
-      } header: {
-        Text("Where things are")
-      } footer: {
-        Text("The log says what Grove did and when, which is the first place to look.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
       }
     }
-    .formStyle(.grouped)
+
+    if model.availableUpdate == nil {
+      SettingNote(text: status).padding(.top, 4)
+    }
+
+    SettingBlock("locations") {
+      VStack(alignment: .leading, spacing: 8) {
+        location("Workspaces", path: model.library.workspaceRoot)
+        HStack(spacing: 8) {
+          location("Log", path: "~/Library/Logs/Grove.log")
+          Button("Show") { model.revealInFinder(Log.file) }
+            .buttonStyle(SettingsButtonStyle())
+        }
+      }
+    }
+  }
+
+  private func location(_ label: String, path: String) -> some View {
+    HStack(spacing: 8) {
+      Text(label)
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(SettingsTheme.title)
+        .frame(width: 88, alignment: .leading)
+      Text(path)
+        .font(.system(size: 11, design: .monospaced))
+        .foregroundStyle(SettingsTheme.detail)
+        .lineLimit(1)
+        .truncationMode(.head)
+        .textSelection(.enabled)
+    }
   }
 
   /// What the last check found, or that none has managed to happen yet.
   private var status: String {
-    guard let checked = model.lastUpdateCheck else { return "Not checked yet" }
+    guard let checked = model.lastUpdateCheck else { return "Not checked yet." }
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .full
-    return "Up to date — checked \(formatter.localizedString(for: checked, relativeTo: Date()))"
-  }
-}
-
-// MARK: - Notifications
-
-/// When Grove interrupts you.
-///
-/// Its own tab rather than a section under Terminal: notifications are about what an agent
-/// is doing, not about how the terminal looks, and filed under Terminal they were somewhere
-/// nobody thought to look.
-struct NotificationSettings: View {
-  @Environment(AppModel.self) private var model
-
-  var body: some View {
-    Form {
-      Section {
-        Toggle(
-          "Tell me when a session is waiting",
-          isOn: Binding(
-            get: { model.notificationsEnabled },
-            set: { model.setNotifications($0) })
-        )
-        if let problem = model.hookError {
-          Text(problem)
-            .font(.caption)
-            .foregroundStyle(.red)
-        }
-      } header: {
-        Text("Notifications")
-      } footer: {
-        Text(
-          "Grove tells you when a session finishes or stops to ask you something, "
-            + "unless you are already looking at it. Either way, a session waiting for "
-            + "you keeps a dot in the sidebar.\n\n"
-            + "Claude Code cannot tell Grove on its own, so this registers a small "
-            + "script in its settings and removes it again when you switch this off. "
-            + "Hooks you already have are left alone, and the file is copied first."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
-    }
-    .formStyle(.grouped)
+    return "Up to date — checked \(formatter.localizedString(for: checked, relativeTo: Date()))."
   }
 }

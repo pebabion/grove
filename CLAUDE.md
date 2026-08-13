@@ -554,3 +554,48 @@ it.
 level stays past WCAG's 7:1 against both Grove's default text and Claude Code's grey, the
 levels are ordered harshest to softest, and each is a neutral grey — a cast would tint
 every uncoloured glyph on it.
+
+## The settings window
+
+Categories down the left, and rows of title, description and control on the right —
+`SettingsShell`, `SettingRow`, `SettingBlock`. It replaced a `TabView` of `Form`s, which
+could not do two things: describe a single setting, since a `Form` footer belongs to a whole
+section and half the settings therefore had no explanation of their own, and be searched,
+which is the only way to find a setting whose group you cannot guess.
+
+**The words live in `SettingsCatalogue`, not in the views.** A row draws its title and
+description from its entry, so a search cannot look for text the row does not show, and the
+two cannot drift. Search is folded and word-by-word: every word must appear somewhere in the
+title, description, keywords or the group's name, in any order, so "mouse terminal" and
+"terminal mouse" find the same thing and typing a group's name lists everything in it. The
+keywords exist for the words nobody wrote down — "color", "glare", "gh".
+
+A row id that is not in the catalogue is a crash on opening the window, by design —
+`entry(_:)` traps rather than drawing a blank row. Check both directions before shipping:
+
+```bash
+grep -ohE 'Setting(Row|Block)\("[a-zA-Z]+"' Grove/*.swift | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort
+grep -oE 'id: "[a-zA-Z]+"' Sources/GroveCore/SettingsCatalogue.swift | sed 's/id: //' | tr -d '"' | sort
+```
+
+`SettingsTheme` holds every colour and metric, measured off the reference screenshot rather
+than guessed — Gruvbox dark: `#282828` behind the content, `#3A3736` for the sidebar and any
+raised control, `#4B4441` for a selection, `#FBF1C7` titles, `#C5B597` descriptions. One file,
+so the window can be re-skinned — including back to the system palette — without touching a
+view.
+
+Three things the framework fights, all found by rendering it:
+
+- **`maxWidth` expands a view, it does not cap one.** A `maxWidth` on every row's control
+  took 210pt from every description and wrapped them two words early. Controls now take the
+  size they need and the text has the slack.
+- **`Menu` with `.borderlessButton` draws no background and keeps its own indicator**, which
+  left the font name floating with a stray chevron. `.menuStyle(.button)` plus a button style
+  is what puts a control in the window's own clothes.
+- **Do not draw a keyboard hint the window cannot honour.** A ⌘ F chip in the footer was
+  written before checking, and the menu bar is offered a key before any view is, so it would
+  have been a lie. The footer counts settings instead, and the search field takes focus when
+  the window opens.
+
+System controls in this window are restyled rather than tinted — `ApplicationPicker` lives
+only here, so it uses the same buttons as everything else.
