@@ -109,6 +109,54 @@ struct TeardownGuardTests {
     #expect(!FileManager.default.fileExists(atPath: created.path))
     #expect(FileManager.default.fileExists(atPath: root.path))
   }
+
+  @Test("takes the skill links with it, and does not delete through them")
+  func removesSkillLinks() async throws {
+    // Grove symlinks each repo's skills into the workspace root, so a removal has to take
+    // them too — and must remove the link rather than what it points at.
+    let sandbox = try Sandbox()
+    let root = sandbox.root.appending(path: "spaces")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let repo = try await sandbox.makeRepository(named: "backend")
+    try sandbox.write(
+      "---\nname: probe\ndescription: a skill\n---\n",
+      to: repo.appending(path: ".claude/skills/probe/SKILL.md"))
+    try await sandbox.commit(in: repo, message: "add a skill")
+
+    let library = RepoLibrary(
+      repos: [RepoEntry(name: "backend", path: repo.path, base: "main")],
+      workspaceRoot: root.path)
+    let created = try await service().create(
+      name: "doomed", branch: "kelvin/doomed", link: nil, repos: library.repos,
+      in: root, onUpdate: { _ in })
+
+    // Creating links it, which is what makes the removal worth asserting.
+    let link = created.appending(path: ".claude/skills/probe")
+    let target = try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)
+    #expect(target == "../../backend/.claude/skills/probe")
+
+    let workspace = Workspace(
+      url: created,
+      file: WorkspaceFile(name: "doomed", branch: "kelvin/doomed", repos: ["backend"]),
+      members: [
+        WorkspaceMember(
+          repoName: "backend", url: created.appending(path: "backend"),
+          branch: "kelvin/doomed", state: .ready)
+      ])
+    try await service().teardown(
+      workspace: workspace, library: library, root: root,
+      deleteBranches: false, onUpdate: { _ in })
+
+    #expect(!FileManager.default.fileExists(atPath: link.path))
+    #expect(!FileManager.default.fileExists(atPath: created.path))
+    // The clone still has its own copy: removing a link must not reach through it. This is
+    // the assertion worth having — the rest of the folder going is easy to see.
+    #expect(
+      FileManager.default.fileExists(
+        atPath: repo.appending(path: ".claude/skills/probe/SKILL.md").path))
+    withExtendedLifetime(sandbox) {}
+  }
 }
 
 /// Removing a worktree is the one operation here that destroys work, so what it reports
