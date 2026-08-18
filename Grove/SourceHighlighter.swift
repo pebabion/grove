@@ -34,7 +34,9 @@ actor SourceHighlighter {
     highlightr = Highlightr()
     // Close to the terminal's own dark palette, so a file and a shell in the same
     // window do not look like two applications.
-    highlightr?.setTheme(to: "atom-one-dark")
+    // Gruvbox, because its background is #282828 — the same colour the rest of the app is
+    // drawn on, so the file sits in the window rather than on a panel of its own.
+    highlightr?.setTheme(to: "gruvbox-dark-medium")
   }
 
   /// Indents the rows a long line wraps onto, so a continuation cannot be mistaken for

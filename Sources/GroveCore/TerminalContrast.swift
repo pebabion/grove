@@ -70,6 +70,20 @@ public enum Contrast {
     return value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
   }
 
+  /// One colour drawn at `alpha` over another, as the hex of the result.
+  ///
+  /// A translucent panel is not the colour it is made of: the sidebar's surface at 55% over
+  /// the background is dimmer than the surface itself, and that is the ground text is
+  /// actually read against.
+  public static func blend(_ top: String, over bottom: String, alpha: Double) -> String? {
+    guard let top = channels(top), let bottom = channels(bottom) else { return nil }
+    let mix = { (a: Int, b: Int) in
+      Int((Double(a) * alpha + Double(b) * (1 - alpha)).rounded())
+    }
+    return String(
+      format: "#%02X%02X%02X", mix(top.0, bottom.0), mix(top.1, bottom.1), mix(top.2, bottom.2))
+  }
+
   private static func channels(_ hex: String) -> (Int, Int, Int)? {
     var text = hex.trimmingCharacters(in: .whitespaces)
     if text.hasPrefix("#") { text.removeFirst() }

@@ -17,7 +17,7 @@ struct UpdatePill: View {
         if model.isDownloadingUpdate {
           ProgressView()
             .controlSize(.small)
-            .tint(.white)
+            .tint(Theme.title)
         } else {
           Image(systemName: "shippingbox.fill")
         }
@@ -25,10 +25,10 @@ struct UpdatePill: View {
           .fontWeight(.medium)
       }
       .font(.caption)
-      .foregroundStyle(.white)
+      .foregroundStyle(Theme.title)
       .padding(.horizontal, 10)
       .padding(.vertical, 5)
-      .background(Color.accentColor, in: Capsule())
+      .background(Theme.highlight, in: Capsule())
     }
     .buttonStyle(.plain)
     .disabled(model.isDownloadingUpdate)

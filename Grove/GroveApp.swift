@@ -1,9 +1,20 @@
+import AppKit
 import GroveCore
 import SwiftUI
 
 @main
 struct GroveApp: App {
   @State private var model = AppModel()
+
+  /// Pins the appearance to dark.
+  ///
+  /// `Theme` is a fixed dark palette, and the parts of a window SwiftUI does not draw —
+  /// scrollers, menus, the sheet behind a file importer — follow the system instead. In
+  /// light mode those came out white against the app's own dark chrome. Set on the
+  /// application rather than per window so a sheet and a menu obey it too.
+  init() {
+    NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+  }
 
   var body: some Scene {
     WindowGroup {

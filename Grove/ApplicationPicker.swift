@@ -22,7 +22,7 @@ struct ApplicationPicker: View {
       if !title.isEmpty {
         Text(title)
           .font(.system(size: 13, weight: .medium))
-          .foregroundStyle(SettingsTheme.title)
+          .foregroundStyle(Theme.title)
       }
       if let path, let icon = Self.icon(for: path) {
         Image(nsImage: icon)
@@ -31,15 +31,15 @@ struct ApplicationPicker: View {
       }
       Text(display)
         .font(.system(size: 12))
-        .foregroundStyle(path == nil ? SettingsTheme.faint : SettingsTheme.detail)
+        .foregroundStyle(path == nil ? Theme.faint : Theme.detail)
         .lineLimit(1)
         .truncationMode(.middle)
 
       Button("Choose…") { choose() }
-        .buttonStyle(SettingsButtonStyle())
+        .buttonStyle(ThemedButtonStyle())
       if path != nil {
         Button("Clear") { path = nil }
-          .buttonStyle(SettingsButtonStyle())
+          .buttonStyle(ThemedButtonStyle())
       }
     }
   }

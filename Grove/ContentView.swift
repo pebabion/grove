@@ -31,6 +31,10 @@ struct ContentView: View {
     // no frame here a NavigationSplitView reports its own size and the window
     // adopts that instead, which is how .defaultSize came to be ignored.
     .frame(minWidth: 900, minHeight: 600)
+    .groveWindow()
+    // The toolbar is part of the same surface as the sidebar under it. Left alone it draws
+    // the system's own material, a lighter band across the top.
+    .toolbarBackground(Theme.surface, for: .windowToolbar)
     .sheet(isPresented: $showingCreate) {
       CreateWorkspaceSheet()
     }
@@ -72,6 +76,10 @@ struct ContentView: View {
         }
       }
     }
+    // A List draws its own material, which has to be turned off before a colour of ours
+    // can show through.
+    .scrollContentBackground(.hidden)
+    .background(Theme.surface.opacity(0.55))
     .overlay {
       if model.isFirstScan {
         VStack(spacing: 8) {
@@ -111,7 +119,8 @@ struct ContentView: View {
       .padding(.horizontal, 12)
       .padding(.vertical, 8)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(.bar)
+      .background(Theme.surface)
+      .overlay(alignment: .top) { Divider().overlay(Theme.divider) }
     }
   }
 
@@ -193,7 +202,7 @@ struct ContentView: View {
     VStack(spacing: 14) {
       Image(systemName: "tree")
         .font(.system(size: 40))
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(Theme.highlight.opacity(0.8))
       Text("Grove")
         .font(.title2.weight(.semibold))
       Text("A workspace holds one worktree per repo, all on the same branch.")
@@ -203,10 +212,10 @@ struct ContentView: View {
         SettingsLink {
           Text("Add your repos")
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(ThemedButtonStyle(prominent: true))
       } else {
         Button("New Workspace…") { showingCreate = true }
-          .buttonStyle(.borderedProminent)
+          .buttonStyle(ThemedButtonStyle(prominent: true))
       }
     }
     .padding(40)
@@ -259,7 +268,7 @@ struct WorkspaceRow: View {
             if member.hasUncommittedChanges {
               Image(systemName: "pencil.circle.fill")
                 .font(.caption2)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.warning)
             }
           }
         }
@@ -268,7 +277,13 @@ struct WorkspaceRow: View {
       sessionRows
     }
     .padding(.vertical, 3)
+    // A selected row is drawn on a lighter ground, where the dimmest tier measures 3.8:1 —
+    // under what body text needs. Promote it rather than brighten the tier everywhere:
+    // `Palette.tiersOnSelection` says which ones are allowed here, and a test holds it.
+    .foregroundStyle(Theme.title, Theme.detail, selected ? Theme.detail : Theme.faint)
   }
+
+  private var selected: Bool { model.selection == workspace.url }
 
   /// The workspace's live sessions, named by whatever is running in them.
   ///
@@ -299,7 +314,7 @@ struct WorkspaceRow: View {
               // should answer on its own.
               if session.needsAttention {
                 Circle()
-                  .fill(Color.orange)
+                  .fill(Theme.warning)
                   .frame(width: 6, height: 6)
               } else if session.isWorking {
                 ProgressView()

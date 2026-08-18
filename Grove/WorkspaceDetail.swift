@@ -191,7 +191,7 @@ struct WorkspaceDetail: View {
       .frame(maxWidth: .infinity)
       // Without this the row is only clickable where it has drawn something.
       .contentShape(Rectangle())
-      .background(hoveringSummary ? Color.primary.opacity(0.06) : .clear)
+      .background(hoveringSummary ? Theme.selection.opacity(0.5) : .clear)
     }
     .buttonStyle(.plain)
     .onHover { hoveringSummary = $0 }
@@ -212,7 +212,7 @@ struct WorkspaceDetail: View {
           }
         }
       }
-      .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+      .grovePanel()
     }
   }
 
@@ -237,12 +237,12 @@ struct WorkspaceDetail: View {
             if member.hasUncommittedChanges {
               Text("· uncommitted changes")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.warning)
             }
             if let detail = activity?.detail, state == .settingUp || state == .failed {
               Text("· \(detail)")
                 .font(.caption)
-                .foregroundStyle(state == .failed ? .red : .secondary)
+                .foregroundStyle(state == .failed ? Theme.danger : Theme.detail)
             }
           }
           .foregroundStyle(.secondary)
@@ -311,7 +311,8 @@ struct WorkspaceDetail: View {
         }
         .frame(maxHeight: 160)
         .padding(8)
-        .background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
+        .background(Theme.background, in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.divider))
       }
     }
     .padding(12)
@@ -379,12 +380,12 @@ struct StateBadge: View {
 
   private var tint: Color {
     switch state {
-    case .ready: .green
-    case .failed: .red
-    case .pending: .secondary
-    case .settingUp: .blue
+    case .ready: Theme.confirm
+    case .failed: Theme.danger
+    case .pending: Theme.faint
+    case .settingUp: Theme.info
     case .unknown: .clear
-    case .removed: .secondary
+    case .removed: Theme.faint
     }
   }
 

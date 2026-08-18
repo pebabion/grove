@@ -53,7 +53,7 @@ struct WorkspaceProgress: View {
           row(for: member)
         }
       }
-      .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+      .grovePanel()
       .frame(maxWidth: 520)
 
       footer
@@ -121,9 +121,10 @@ struct WorkspaceProgress: View {
   private func mark(for state: RepoState) -> some View {
     switch state {
     case .ready, .removed:
-      Image(systemName: "checkmark").foregroundStyle(.green).font(.caption)
+      Image(systemName: "checkmark").foregroundStyle(Theme.confirm).font(.caption)
     case .failed:
-      Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
+      Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning).font(
+        .caption)
     case .settingUp:
       ProgressView().controlSize(.small).scaleEffect(0.7)
     default:

@@ -85,7 +85,7 @@ struct ShortcutGuide: View {
         }
       }
       .padding(16)
-      .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+      .grovePanel()
       // Held to the width the three columns actually need. Stretched across a wide
       // window the pairs drift apart until a key and what it does stop looking related.
       .frame(maxWidth: 720)

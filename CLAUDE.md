@@ -639,3 +639,47 @@ Two things that came out of doing it:
 looks an order of magnitude cheaper — but an offscreen `MTKView` submits its work
 asynchronously, so that number is not honest and it stays unclaimed until it is measured on
 screen.
+
+## One palette, for the whole app
+
+`Theme` is Grove's palette and `Palette` in GroveCore holds the values it reads. Gruvbox dark
+everywhere, not only in Settings: `#282828` behind content, `#3A3736` for the sidebar and any
+raised control, `#4B4441` for a selection, `#FBF1C7` titles, `#C5B597` descriptions,
+`#B2A28C` for a value only there for reference.
+
+**The three-argument `foregroundStyle` is what made this cheap.** `.groveWindow()` sets the
+primary, secondary and tertiary styles for every descendant, so the `.foregroundStyle(.secondary)`
+already written throughout the app resolves to this palette. Re-skinning would otherwise have
+meant editing every label in every view. What still needed doing by hand was anything that
+draws its own ground: a `List` and a `Form` paint a system material and must be told
+`.scrollContentBackground(.hidden)` first, `.background(.bar)` in the footer, the toolbar
+(`.toolbarBackground(_:for: .windowToolbar)`), and each sheet, which is its own window.
+
+**`GroveApp` pins the appearance to `.darkAqua`.** The palette is fixed dark, and the parts
+of a window SwiftUI does not draw — scrollers, menus, the panel behind a file importer —
+follow the system. In light mode those came out white in the middle of the app's own chrome.
+
+**Colours that mean something are not themed.** Repo swatches identify a repo, the pull
+request badge uses GitHub's own state colours, and a file's icon carries its language's
+colour. Those are data, not chrome.
+
+The file viewer switched to highlight.js's `gruvbox-dark-medium`, whose background is
+`#282828` — the same colour as the window, so a file sits in the pane rather than on a panel
+of its own.
+
+### Contrast is asserted, not eyeballed
+
+`PaletteTests` holds every text tier to WCAG's 4.5:1 on every ground it is drawn on, titles
+to 7:1, and the tiers to being distinguishable from each other. Two things it caught:
+
+- **A panel is dimmer than the surface it is made of.** The cards are `surface` at 50% over
+  the background, which is `#31302F` — measuring against the surface alone flattered every
+  tier by about half a point. `Contrast.blend` exists so the grounds list includes what text
+  actually sits on.
+- **The dimmest tier fails on a selected row** — 3.8:1 on `#4B4441`. Brightening it enough
+  to pass would have put it within half a point of the tier above, collapsing three into
+  two everywhere else. So a selected row promotes its dimmest text instead, which is the
+  right way round anyway: the row you chose is the one you are reading.
+  `Palette.tiersOnSelection` says which tiers may appear there, and the test asserts both
+  that they pass and that the dim one still fails — so if the palette ever changes enough to
+  make the rule unnecessary, the test says so.

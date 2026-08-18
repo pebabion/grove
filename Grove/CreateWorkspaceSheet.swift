@@ -103,10 +103,14 @@ struct CreateWorkspaceSheet: View {
                   .foregroundStyle(.secondary)
               }
             }
+            .toggleStyle(ThemedToggleStyle())
           }
         }
       }
       .formStyle(.grouped)
+      // The form draws the system's own grouped background, a neutral grey panel in the
+      // middle of a warm window.
+      .scrollContentBackground(.hidden)
 
       Divider()
 
@@ -128,12 +132,13 @@ struct CreateWorkspaceSheet: View {
           }
         }
         .keyboardShortcut(.defaultAction)
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(ThemedButtonStyle(prominent: true))
         .disabled(!canCreate)
       }
       .padding(16)
     }
     .frame(width: 480, height: 500)
+    .groveWindow()
   }
 
   /// The branch that will actually be created.

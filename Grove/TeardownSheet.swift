@@ -58,6 +58,7 @@ struct TeardownSheet: View {
 
       VStack(alignment: .leading, spacing: 12) {
         Toggle("Also delete the local branch", isOn: $deleteBranches)
+          .toggleStyle(ThemedToggleStyle())
           .help("Removing a worktree leaves its branch behind. Tick this to drop it too.")
 
         HStack {
@@ -69,13 +70,14 @@ struct TeardownSheet: View {
             dismiss()
             Task { await perform(deleteBranches: branches) }
           }
-          .buttonStyle(.borderedProminent)
+          .buttonStyle(ThemedButtonStyle(prominent: true))
           .disabled(isAuditing)
         }
       }
       .padding(16)
     }
     .frame(width: 560, height: 520)
+    .groveWindow()
     .task { await audit() }
   }
 
@@ -122,7 +124,7 @@ struct TeardownSheet: View {
     return VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
         Image(systemName: risk.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-          .foregroundStyle(risk.isEmpty ? Color.green : Color.orange)
+          .foregroundStyle(risk.isEmpty ? Theme.confirm : Theme.warning)
         Text(member.repoName)
           .fontWeight(.medium)
         if let mark = landedMark(for: member) {
@@ -143,17 +145,17 @@ struct TeardownSheet: View {
           .foregroundStyle(.secondary)
       } else {
         VStack(alignment: .leading, spacing: 6) {
-          group("Commits on no remote", risk.unpushedCommits, tint: .red)
-          group("Uncommitted changes", risk.uncommittedFiles, tint: .orange)
-          group("Untracked files", risk.untrackedFiles, tint: .orange)
-          group("Real .env files, not symlinks", risk.unlinkedEnvFiles, tint: .red)
+          group("Commits on no remote", risk.unpushedCommits, tint: Theme.danger)
+          group("Uncommitted changes", risk.uncommittedFiles, tint: Theme.warning)
+          group("Untracked files", risk.untrackedFiles, tint: Theme.warning)
+          group("Real .env files, not symlinks", risk.unlinkedEnvFiles, tint: Theme.danger)
           group("Ignored files", risk.ignoredFiles, tint: .secondary)
         }
       }
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+    .grovePanel()
   }
 
   /// A badge only when the work's fate is worth knowing.
@@ -172,10 +174,10 @@ struct TeardownSheet: View {
     guard let pr = model.pullRequest(for: member)?.pullRequest else { return nil }
     switch pr.state {
     case "MERGED":
-      return ("merged", .green, "Pull request #" + String(pr.number) + " was merged")
+      return ("merged", Theme.confirm, "Pull request #" + String(pr.number) + " was merged")
     case "CLOSED":
       return (
-        "closed unmerged", .orange,
+        "closed unmerged", Theme.warning,
         "Pull request #" + String(pr.number) + " was closed without merging"
       )
     default:

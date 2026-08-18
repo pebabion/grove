@@ -43,10 +43,10 @@ struct SettingRow<Control: View>: View {
         VStack(alignment: .leading, spacing: 3) {
           Text(entry.title)
             .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(SettingsTheme.title)
+            .foregroundStyle(Theme.title)
           Text(entry.detail)
             .font(.system(size: 12))
-            .foregroundStyle(SettingsTheme.detail)
+            .foregroundStyle(Theme.detail)
             .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -57,8 +57,8 @@ struct SettingRow<Control: View>: View {
           .frame(width: controlWidth, alignment: .trailing)
           .fixedSize(horizontal: controlWidth == nil, vertical: false)
       }
-      .padding(.vertical, SettingsTheme.rowSpacing)
-      Divider().overlay(SettingsTheme.divider)
+      .padding(.vertical, Theme.rowSpacing)
+      Divider().overlay(Theme.divider)
     }
   }
 }
@@ -83,16 +83,16 @@ struct SettingBlock<Content: View>: View {
         VStack(alignment: .leading, spacing: 3) {
           Text(entry.title)
             .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(SettingsTheme.title)
+            .foregroundStyle(Theme.title)
           Text(entry.detail)
             .font(.system(size: 12))
-            .foregroundStyle(SettingsTheme.detail)
+            .foregroundStyle(Theme.detail)
             .fixedSize(horizontal: false, vertical: true)
         }
         content()
       }
-      .padding(.vertical, SettingsTheme.rowSpacing)
-      Divider().overlay(SettingsTheme.divider)
+      .padding(.vertical, Theme.rowSpacing)
+      Divider().overlay(Theme.divider)
     }
   }
 }
@@ -100,7 +100,7 @@ struct SettingBlock<Content: View>: View {
 /// A note under a row: a warning, a live value, whatever the row has to add.
 struct SettingNote: View {
   let text: String
-  var tint: Color = SettingsTheme.faint
+  var tint: Color = Theme.faint
 
   var body: some View {
     Text(text)
@@ -128,10 +128,10 @@ struct SettingsShell: View {
   var body: some View {
     HStack(spacing: 0) {
       sidebar
-      Divider().overlay(SettingsTheme.divider)
+      Divider().overlay(Theme.divider)
       content
     }
-    .background(SettingsTheme.background)
+    .background(Theme.background)
     .frame(width: 880, height: 620)
     .onAppear { searching = true }
   }
@@ -160,13 +160,13 @@ struct SettingsShell: View {
           .font(.system(size: 11))
         Spacer()
       }
-      .foregroundStyle(SettingsTheme.faint)
+      .foregroundStyle(Theme.faint)
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
-      .overlay(alignment: .top) { Divider().overlay(SettingsTheme.divider) }
+      .overlay(alignment: .top) { Divider().overlay(Theme.divider) }
     }
-    .frame(width: SettingsTheme.sidebarWidth)
-    .background(SettingsTheme.surface.opacity(0.55))
+    .frame(width: Theme.sidebarWidth)
+    .background(Theme.surface.opacity(0.55))
   }
 
   /// A count rather than a shortcut, and it changes as the search narrows.
@@ -182,11 +182,11 @@ struct SettingsShell: View {
     HStack(spacing: 6) {
       Image(systemName: "magnifyingglass")
         .font(.system(size: 11))
-        .foregroundStyle(SettingsTheme.faint)
+        .foregroundStyle(Theme.faint)
       TextField("Search settings…", text: $query)
         .textFieldStyle(.plain)
         .font(.system(size: 12))
-        .foregroundStyle(SettingsTheme.title)
+        .foregroundStyle(Theme.title)
         .focused($searching)
       if !query.isEmpty {
         Button {
@@ -194,17 +194,17 @@ struct SettingsShell: View {
         } label: {
           Image(systemName: "xmark.circle.fill")
             .font(.system(size: 11))
-            .foregroundStyle(SettingsTheme.faint)
+            .foregroundStyle(Theme.faint)
         }
         .buttonStyle(.plain)
       }
     }
     .padding(.horizontal, 8)
     .padding(.vertical, 6)
-    .background(RoundedRectangle(cornerRadius: SettingsTheme.corner).fill(SettingsTheme.background))
+    .background(RoundedRectangle(cornerRadius: Theme.corner).fill(Theme.background))
     .overlay(
-      RoundedRectangle(cornerRadius: SettingsTheme.corner)
-        .strokeBorder(searching ? SettingsTheme.accent : SettingsTheme.divider, lineWidth: 1)
+      RoundedRectangle(cornerRadius: Theme.corner)
+        .strokeBorder(searching ? Theme.accent : Theme.divider, lineWidth: 1)
     )
     .onExitCommand { query = "" }
   }
@@ -229,16 +229,16 @@ struct SettingsShell: View {
           if hits > 0 {
             Text("\(hits)")
               .font(.system(size: 10, weight: .medium, design: .monospaced))
-              .foregroundStyle(SettingsTheme.faint)
+              .foregroundStyle(Theme.faint)
           }
         }
       }
-      .foregroundStyle(chosen ? SettingsTheme.title : SettingsTheme.detail)
+      .foregroundStyle(chosen ? Theme.title : Theme.detail)
       .padding(.horizontal, 8)
       .padding(.vertical, 5)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
-        RoundedRectangle(cornerRadius: 5).fill(chosen ? SettingsTheme.selection : .clear)
+        RoundedRectangle(cornerRadius: 5).fill(chosen ? Theme.selection : .clear)
       )
       .contentShape(Rectangle())
     }
@@ -252,10 +252,10 @@ struct SettingsShell: View {
           VStack(alignment: .leading, spacing: 4) {
             Text(item.label)
               .font(.system(size: 20, weight: .semibold))
-              .foregroundStyle(SettingsTheme.title)
+              .foregroundStyle(Theme.title)
             Text(item.blurb)
               .font(.system(size: 12))
-              .foregroundStyle(SettingsTheme.detail)
+              .foregroundStyle(Theme.detail)
           }
           .padding(.top, item == shown.first ? 0 : 24)
           .padding(.bottom, 6)
@@ -267,16 +267,16 @@ struct SettingsShell: View {
           VStack(spacing: 6) {
             Text("Nothing matches “\(query)”")
               .font(.system(size: 13, weight: .medium))
-              .foregroundStyle(SettingsTheme.title)
+              .foregroundStyle(Theme.title)
             Text("Try a word from the setting's name, or the group it might be in.")
               .font(.system(size: 11.5))
-              .foregroundStyle(SettingsTheme.detail)
+              .foregroundStyle(Theme.detail)
           }
           .frame(maxWidth: .infinity)
           .padding(.top, 60)
         }
       }
-      .padding(.horizontal, SettingsTheme.contentPadding)
+      .padding(.horizontal, Theme.contentPadding)
       .padding(.vertical, 20)
       .frame(maxWidth: .infinity, alignment: .leading)
     }

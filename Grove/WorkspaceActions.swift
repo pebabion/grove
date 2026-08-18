@@ -130,7 +130,7 @@ struct RenameSheet: View {
         .font(.title3.weight(.semibold))
 
       TextField("Name", text: $name, prompt: Text("Something you'll recognise in a week"))
-        .textFieldStyle(.roundedBorder)
+        .textFieldStyle(ThemedFieldStyle())
         .onSubmit { commit() }
 
       VStack(alignment: .leading, spacing: 4) {
@@ -155,12 +155,13 @@ struct RenameSheet: View {
           .keyboardShortcut(.cancelAction)
         Button("Rename") { commit() }
           .keyboardShortcut(.defaultAction)
-          .buttonStyle(.borderedProminent)
+          .buttonStyle(ThemedButtonStyle(prominent: true))
           .disabled(WorkspaceNaming.slug(name).isEmpty)
       }
     }
     .padding(20)
     .frame(width: 460)
+    .groveWindow()
     .onAppear { name = workspace.file.name }
   }
 

@@ -70,7 +70,7 @@ struct FileBrowser: View {
           .onSubmit { if selection == nil { selection = matches.first } }
       }
       .padding(8)
-      Divider()
+      Divider().overlay(Theme.divider)
 
       if isLoading {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -102,9 +102,10 @@ struct FileBrowser: View {
           .tag(file)
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
       }
 
-      Divider()
+      Divider().overlay(Theme.divider)
       HStack {
         Text(countLabel)
           .font(.caption)
@@ -115,6 +116,7 @@ struct FileBrowser: View {
       .padding(.vertical, 5)
     }
     .frame(minWidth: 220, idealWidth: 300, maxWidth: 420)
+    .background(Theme.surface.opacity(0.55))
     .onAppear { searchFocused = true }
   }
 
@@ -128,7 +130,7 @@ struct FileBrowser: View {
     if let selection {
       VStack(spacing: 0) {
         header(for: selection)
-        Divider()
+        Divider().overlay(Theme.divider)
         body(for: selection)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -179,7 +181,7 @@ struct FileBrowser: View {
       } label: {
         Image(systemName: copied == file ? "checkmark" : "doc.on.doc")
           .font(.caption)
-          .foregroundStyle(copied == file ? Color.green : .secondary)
+          .foregroundStyle(copied == file ? Theme.confirm : Theme.detail)
       }
       .buttonStyle(.plain)
       .help("Copy \(copyable(file))")

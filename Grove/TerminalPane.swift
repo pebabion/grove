@@ -31,10 +31,12 @@ struct TerminalPane: View {
   var body: some View {
     VStack(spacing: 0) {
       tabStrip
-      Divider()
+      Divider().overlay(Theme.divider)
       terminal
     }
-    .background(Color(nsColor: .textBackgroundColor))
+    // The strip belongs to the window, not to the terminal: the terminal keeps its own
+    // background, which is a separate setting and deliberately neutral.
+    .background(Theme.surface)
     .task(id: sessions.isEmpty) {
       // One session to begin with, in the workspace root. Starting from the body
       // would resurrect a shell the moment it exited.
@@ -62,14 +64,14 @@ struct TerminalPane: View {
               .lineLimit(1)
             if session.needsAttention {
               Circle()
-                .fill(Color.orange)
+                .fill(Theme.warning)
                 .frame(width: 5, height: 5)
             }
           }
           .padding(.horizontal, 8)
           .padding(.vertical, 4)
           .background(
-            session.id == current?.id ? Color.accentColor.opacity(0.25) : .clear,
+            session.id == current?.id ? Theme.selection : .clear,
             in: Capsule()
           )
         }
