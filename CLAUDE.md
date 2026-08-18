@@ -683,3 +683,18 @@ to 7:1, and the tiers to being distinguishable from each other. Two things it ca
   `Palette.tiersOnSelection` says which tiers may appear there, and the test asserts both
   that they pass and that the dim one still fails — so if the palette ever changes enough to
   make the rule unnecessary, the test says so.
+
+## Pin dependencies exactly
+
+`project.yml` uses `exactVersion`, not `from`. `from: 1.16.0` accepts anything below 2.0, so
+a fresh resolve in CI took SwiftTerm 1.19.0 while this machine kept 1.16.0 — the version
+every timing in this file was measured against, and the one whose redraw and echo behaviour
+was checked against a live session. The release failed outright, because 1.19.0 ships a build
+plug-in (`SwiftTermBuildInfoPlugin`) that `xcodebuild` will not run without validation. A
+floating dependency means the DMG is not built from what was tested; the failure was the
+lucky outcome.
+
+Upgrading is a deliberate act: read what changed, measure the keystroke cost again, check a
+resize and a scrollback, then move the pin. `Grove.xcodeproj` is generated and gitignored, so
+there is no `Package.resolved` in the repo to hold a version down — the pin is the only thing
+that does.
