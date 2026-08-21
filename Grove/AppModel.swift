@@ -740,7 +740,16 @@ final class AppModel {
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
 
     isBusy = true
-    defer { isBusy = false }
+    busyLabel = "Adding \(repoName) to \(workspace.name)"
+    // Straight into the list, before any of the slow work. A fetch, a worktree and a setup
+    // hook run first, and then a scan of the whole root takes about two seconds — so
+    // waiting for disk meant several seconds of the sidebar looking untouched.
+    workspaces = WorkspaceEdit.inserting(
+      repoName, at: workspace.url, branch: workspace.file.branch, into: workspaces)
+    defer {
+      isBusy = false
+      busyLabel = nil
+    }
     do {
       try await service.addRepo(
         repo,

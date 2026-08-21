@@ -698,3 +698,23 @@ Upgrading is a deliberate act: read what changed, measure the keystroke cost aga
 resize and a scrollback, then move the pin. `Grove.xcodeproj` is generated and gitignored, so
 there is no `Package.resolved` in the repo to hold a version down — the pin is the only thing
 that does.
+
+## Adding a repo shows its row before disk has it
+
+Measured against a real root: a scan is **1.85s** for five workspaces and thirteen
+worktrees, and adding a repo does a fetch, a `git worktree add` and a setup hook before
+that scan even starts. Waiting for the rescan meant clicking Add and watching an unchanged
+sidebar for several seconds — which reads as the click having missed, and was reported as
+"the repo does not show up". The log settled it: the row appeared at 11:32:12, five seconds
+after the screenshot that said it had not.
+
+`WorkspaceEdit.inserting` puts a `pending` member in the list straight away, and
+`addRepo` sets `busyLabel` so the footer names what is happening. Two details matter,
+both tested: the member's URL is in `identity` form, or the terminal and files panes stop
+matching it, and the members stay sorted by name, because the scanner sorts and a row that
+appears at the end and then jumps looks like a glitch.
+
+**A workspace's own directory is not watched, only the root and each worktree's git
+directory.** So a worktree added by hand inside a workspace produces no event and the list
+stays stale until something else scans. That is the same reason this needed doing in the
+model rather than left to the watcher.
