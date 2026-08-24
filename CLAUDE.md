@@ -718,3 +718,20 @@ appears at the end and then jumps looks like a glitch.
 directory.** So a worktree added by hand inside a workspace produces no event and the list
 stays stale until something else scans. That is the same reason this needed doing in the
 model rather than left to the watcher.
+
+## The keyboard follows the terminal
+
+A pane with a shell in it is what someone is typing into, so it takes the keyboard when it
+comes on screen: switching workspace, opening it with ⌘ J, or a first shell arriving.
+Before this, only clicking a tab focused a session, so switching workspace left the
+keyboard in the sidebar and the first thing typed to an agent went nowhere.
+
+`TerminalFocus.shouldTakeKeyboard` is in GroveCore because the two ways to get it wrong are
+worth writing down: with no session there is nothing to type into, and while the file
+browser is open its search field owns the keyboard — a terminal grabbing it back would
+leave the two fighting over every keystroke. Closing the files pane hands it back.
+
+`onAppear` is the hook because switching workspace rebuilds the detail view. The trade-off,
+taken deliberately: clicking a sidebar row no longer leaves the list focused, so ↑ and ↓ do
+not walk the workspaces afterwards. ⌘ ⇧ [ and ⌘ ⇧ ] do that, and they are in the shortcut
+guide.

@@ -28,6 +28,19 @@ struct TerminalPane: View {
     model.activeSession(in: workspace) ?? sessions.first
   }
 
+  private var filesShowing: Bool { model.fileWorkspaces.contains(workspace.url) }
+
+  /// Puts the keyboard in the terminal when the terminal is what is on screen.
+  ///
+  /// Switching workspaces rebuilds this view, which is what makes `onAppear` the right
+  /// hook: the keyboard follows the workspace rather than staying in the sidebar.
+  private func takeKeyboard() {
+    guard
+      TerminalFocus.shouldTakeKeyboard(hasSession: current != nil, filesShowing: filesShowing)
+    else { return }
+    current?.focus()
+  }
+
   var body: some View {
     VStack(spacing: 0) {
       tabStrip
@@ -48,6 +61,15 @@ struct TerminalPane: View {
       // Not while a session is waiting for the workspace to exist: closing then is what
       // made a terminal opened during creation look as though it had been killed.
       if count == 0, !model.isCreating(workspace) { showing = false }
+    }
+    // Coming on screen: switching workspace, opening the pane with ⌘ J, or a shell
+    // arriving in a workspace that had none.
+    .onAppear { takeKeyboard() }
+    .onChange(of: current?.id) { _, _ in takeKeyboard() }
+    // Closing the files pane hands the keyboard back rather than leaving it in a search
+    // field that is no longer there.
+    .onChange(of: filesShowing) { _, showing in
+      if !showing { takeKeyboard() }
     }
   }
 
