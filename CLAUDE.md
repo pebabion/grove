@@ -741,7 +741,13 @@ guide.
 A workspace is one branch across every repo, so printing each repo's branch printed the same
 string three times — and the one fact worth reading, a repo sitting on someone else's branch,
 looked exactly like its neighbours. `WorkspaceSummary` in GroveCore answers the question
-instead: the shared branch once, and only the repos that are somewhere else.
+instead: the shared branch once, under the name.
+
+**Every repo is still named on the row.** Listing only the divergent ones was tried and
+misread within the hour, reasonably — a row showing one repo out of three reads as a workspace
+with one repo in it. The names are what say what is in the workspace; the branch is the part
+worth saying once. So: a line per repo, and a branch only on the ones that are somewhere
+else.
 
 Its edge cases are the tested part. A repo with no branch is **not** divergent — it is
 pending or detached, and its state already says so; a blank branch presented as news is
