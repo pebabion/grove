@@ -184,12 +184,12 @@ struct ContentView: View {
 
   private var sidebarEmptyState: some View {
     VStack(spacing: 6) {
-      Text(model.library.repos.isEmpty ? "No repos yet" : "No workspaces yet")
+      Text(model.library.repos.isEmpty ? "No repos yet" : "Nothing in flight")
         .font(.headline)
       Text(
         model.library.repos.isEmpty
-          ? "Add repositories in Settings, then create a workspace."
-          : "Press ⌘ + N to create one."
+          ? "Grove needs to know where your clones are."
+          : "\(model.library.repos.count) repos ready."
       )
       .font(.caption)
       .multilineTextAlignment(.center)
@@ -203,19 +203,43 @@ struct ContentView: View {
       Image(systemName: "tree")
         .font(.system(size: 40))
         .foregroundStyle(Theme.highlight.opacity(0.8))
-      Text("Grove")
+
+      // This screen is where someone learns what the app is for, so it says it rather
+      // than naming itself twice.
+      Text(model.library.repos.isEmpty ? "Point Grove at a clone" : "Nothing in flight")
         .font(.title2.weight(.semibold))
-      Text("A workspace holds one worktree per repo, all on the same branch.")
-        .foregroundStyle(.secondary)
+      Text(
+        model.library.repos.isEmpty
+          ? "A workspace is one branch checked out across every repo it touches. Grove needs "
+            + "to know where those repos live before it can make one."
+          : "A new workspace cuts a branch in each repo you pick and installs what they need."
+      )
+      .foregroundStyle(.secondary)
+      .multilineTextAlignment(.center)
+      .frame(maxWidth: 380)
 
       if model.library.repos.isEmpty {
         SettingsLink {
-          Text("Add your repos")
+          Text("Add a repo…")
         }
         .buttonStyle(ThemedButtonStyle(prominent: true))
       } else {
-        Button("New Workspace…") { showingCreate = true }
-          .buttonStyle(ThemedButtonStyle(prominent: true))
+        HStack(spacing: 10) {
+          Button("New workspace…") { showingCreate = true }
+            .buttonStyle(ThemedButtonStyle(prominent: true))
+          // Beside the button rather than instead of it: the shortcut is worth learning,
+          // and a screen that only names a shortcut cannot be acted on with the mouse.
+          HStack(spacing: 5) {
+            Text("⌘ N")
+              .font(.system(.caption2, design: .monospaced))
+              .padding(.horizontal, 5)
+              .padding(.vertical, 2)
+              .background(RoundedRectangle(cornerRadius: 4).fill(Theme.selection))
+            Text("does the same")
+              .font(.caption)
+          }
+          .foregroundStyle(.tertiary)
+        }
       }
     }
     .padding(40)
@@ -232,27 +256,77 @@ struct WorkspaceRow: View {
   @Environment(AppModel.self) private var model
   let workspace: Workspace
 
-  var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack(spacing: 6) {
-        Text(workspace.name)
-          .lineLimit(1)
-          .truncationMode(.tail)
-        Spacer(minLength: 6)
-        if let size = model.sizes[workspace.url] {
-          Text(size.formatted)
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
-        }
-      }
+  /// What the row prints: the branch once, and only the repos that are somewhere else.
+  private var summary: WorkspaceSummary { WorkspaceSummary(workspace) }
 
-      if workspace.members.isEmpty {
-        Text(workspace.file.branch.isEmpty ? "no repos on disk" : workspace.file.branch)
-          .font(.caption)
-          .foregroundStyle(.tertiary)
-          .lineLimit(1)
-      } else {
-        ForEach(workspace.members) { member in
+  /// Whether any session in this workspace is waiting for a human.
+  private var waiting: Bool {
+    model.terminals.sessions(in: workspace.url).contains(where: \.needsAttention)
+  }
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 8) {
+      // A workspace with a session waiting is the one thing worth finding while scanning a
+      // column of rows, and a dot on a session line three lines down is not findable.
+      RoundedRectangle(cornerRadius: 1)
+        .fill(waiting ? Theme.warning : .clear)
+        .frame(width: 2)
+
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 6) {
+          Text(workspace.name)
+            .fontWeight(.medium)
+            .lineLimit(1)
+            .truncationMode(.tail)
+          Spacer(minLength: 6)
+          if let size = model.sizes[workspace.url] {
+            Text(size.formatted)
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+        }
+
+        if let branch = summary.sharedBranch {
+          Text(branch)
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.head)
+        } else if workspace.members.isEmpty {
+          Text("no repos on disk")
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+        }
+
+        if !workspace.members.isEmpty {
+          HStack(spacing: 7) {
+            HStack(spacing: 3) {
+              ForEach(workspace.members) { member in
+                RepoSwatch(repo: member.repoName, size: 7)
+              }
+            }
+            Text("\(summary.repoCount) \(summary.repoCount == 1 ? "repo" : "repos")")
+              .font(.caption)
+              .foregroundStyle(.tertiary)
+            if summary.dirtyCount > 0 {
+              // Uncommitted work is what makes a workspace unsafe to remove, so it is
+              // worth a count rather than a mark per repo.
+              Label("\(summary.dirtyCount)", systemImage: "pencil")
+                .font(.caption2)
+                .foregroundStyle(Theme.warning)
+            }
+            if summary.failedCount > 0 {
+              Label("\(summary.failedCount)", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(Theme.danger)
+            }
+            Spacer(minLength: 0)
+          }
+        }
+
+        // Only the repos that are not on the workspace's branch. Everything else is
+        // covered by the line above, and printing it again is what made rows unreadable.
+        ForEach(summary.divergent) { member in
           HStack(spacing: 5) {
             RepoSwatch(repo: member.repoName, size: 7)
             Text(member.repoName)
@@ -262,19 +336,14 @@ struct WorkspaceRow: View {
             // Branches share long prefixes, so keep the distinctive tail.
             Text(member.branch ?? "detached")
               .font(.system(.caption2, design: .monospaced))
-              .foregroundStyle(.tertiary)
+              .foregroundStyle(Theme.warning)
               .lineLimit(1)
               .truncationMode(.head)
-            if member.hasUncommittedChanges {
-              Image(systemName: "pencil.circle.fill")
-                .font(.caption2)
-                .foregroundStyle(Theme.warning)
-            }
           }
         }
-      }
 
-      sessionRows
+        sessionRows
+      }
     }
     .padding(.vertical, 3)
     // A selected row is drawn on a lighter ground, where the dimmest tier measures 3.8:1 —

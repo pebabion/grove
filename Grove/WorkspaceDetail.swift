@@ -180,6 +180,21 @@ struct WorkspaceDetail: View {
 
         Spacer()
 
+        // Collapsed, this bar was the whole workspace: a name and a branch. What someone
+        // wants from it is whether anything needs them, so the counts come up here.
+        let summary = WorkspaceSummary(workspace)
+        if summary.repoCount > 0 {
+          chip("\(summary.readyCount) of \(summary.repoCount) ready", tint: Theme.confirm)
+        }
+        if summary.dirtyCount > 0 {
+          chip("\(summary.dirtyCount) uncommitted", tint: Theme.warning, symbol: "pencil")
+        }
+        if summary.failedCount > 0 {
+          chip(
+            "\(summary.failedCount) failed", tint: Theme.danger,
+            symbol: "exclamationmark.triangle.fill")
+        }
+
         if let size = model.sizes[workspace.url] {
           Text(size.formatted)
             .font(.caption.monospacedDigit())
@@ -197,6 +212,26 @@ struct WorkspaceDetail: View {
     .onHover { hoveringSummary = $0 }
     .animation(.easeInOut(duration: 0.12), value: showingDetails)
     .help(showingDetails ? "Hide the repo list" : "Show the repo list")
+  }
+
+  /// One state count. Quiet on purpose: these are read at a glance, not clicked.
+  private func chip(_ text: String, tint: Color, symbol: String? = nil) -> some View {
+    HStack(spacing: 4) {
+      if let symbol {
+        Image(systemName: symbol)
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(tint)
+      } else {
+        Circle().fill(tint).frame(width: 6, height: 6)
+      }
+      Text(text)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+    .padding(.horizontal, 7)
+    .padding(.vertical, 2)
+    .background(Capsule().fill(Theme.surface))
+    .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
   }
 
   private var repoList: some View {

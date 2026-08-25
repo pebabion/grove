@@ -735,3 +735,32 @@ leave the two fighting over every keystroke. Closing the files pane hands it bac
 taken deliberately: clicking a sidebar row no longer leaves the list focused, so ↑ and ↓ do
 not walk the workspaces afterwards. ⌘ ⇧ [ and ⌘ ⇧ ] do that, and they are in the shortcut
 guide.
+
+## What a sidebar row says
+
+A workspace is one branch across every repo, so printing each repo's branch printed the same
+string three times — and the one fact worth reading, a repo sitting on someone else's branch,
+looked exactly like its neighbours. `WorkspaceSummary` in GroveCore answers the question
+instead: the shared branch once, and only the repos that are somewhere else.
+
+Its edge cases are the tested part. A repo with no branch is **not** divergent — it is
+pending or detached, and its state already says so; a blank branch presented as news is
+worse than nothing. What `grove.json` records beats what the repos happen to be on, so a
+workspace whose repos have all been switched away by hand shows all of them as exceptions,
+which is exactly what should be visible. A workspace adopted from disk has nothing recorded,
+so the repos' own agreement stands in, and when they agree on nothing every one gets a line —
+there is nothing to say once.
+
+The rest of the row is counts rather than marks: repo swatches with `N repos`, a count of
+uncommitted repos, a count of failed ones. **A session waiting for a human gets a bar down
+the left of the row**, because a dot on a session line three lines down cannot be found while
+scanning a column.
+
+The detail pane's summary bar carries the same counts. Collapsed, that bar was the entire
+workspace — a name and a branch — and what someone wants from it is whether anything needs
+them.
+
+Empty screens name the state and offer the action: "Point Grove at a clone" with what a
+workspace *is*, since that screen is where someone learns it, and the shortcut sits beside
+the button rather than instead of it. "Press ⌘ N to create one" was the only thing the old
+one said, and it cannot be clicked.
