@@ -751,12 +751,16 @@ which is exactly what should be visible. A workspace adopted from disk has nothi
 so the repos' own agreement stands in, and when they agree on nothing every one gets a line —
 there is nothing to say once.
 
-The rest of the row is marks, not words: the repo swatches say how many there are, and a
-count appears only for uncommitted or failed repos. A written "3 repos" was tried and read as
-a bug — the list under it shows only the exceptions, so the number contradicted the two lines
-below it. And a divergent branch is **not** warning-coloured: that a repo is somewhere else is
-said by the line existing at all, and a column of yellow made every workspace look alarming
-when most were fine. **A session waiting for a human gets a bar down
+**There is no repo indicator on the row at all.** A written "3 repos" was tried first and read
+as a bug, because the list under it shows only the exceptions — the number contradicted the two
+lines below it. A row of coloured swatches replaced it and was no better: the repos are in the
+pane beside the sidebar, and a line of squares under every workspace answered a question nobody
+asks while scanning. What survives on the name row is the two marks worth interrupting for, and
+only when they are true: a failed setup, and uncommitted work.
+
+A divergent branch is **not** warning-coloured either. That a repo is somewhere else is said by
+the line existing at all, and a column of yellow made every workspace look alarming when most
+were fine. **A session waiting for a human gets a bar down
 the left of the row**, because a dot on a session line three lines down cannot be found while
 scanning a column.
 

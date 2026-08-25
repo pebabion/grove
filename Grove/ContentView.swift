@@ -279,6 +279,22 @@ struct WorkspaceRow: View {
             .lineLimit(1)
             .truncationMode(.tail)
           Spacer(minLength: 6)
+          // No row of swatches: the repos are in the pane beside this, and a line of
+          // coloured squares under every workspace said nothing anyone needed while
+          // scanning. What is left is the two things worth interrupting for, and only
+          // when they are true.
+          if summary.failedCount > 0 {
+            Image(systemName: "exclamationmark.triangle.fill")
+              .font(.caption2)
+              .foregroundStyle(Theme.danger)
+              .help("\(summary.failedCount) repo setup failed")
+          }
+          if summary.dirtyCount > 0 {
+            Image(systemName: "pencil")
+              .font(.system(size: 9, weight: .semibold))
+              .foregroundStyle(Theme.warning)
+              .help("Uncommitted work in \(summary.dirtyCount) of \(summary.repoCount)")
+          }
           if let size = model.sizes[workspace.url] {
             Text(size.formatted)
               .font(.caption.monospacedDigit())
@@ -296,29 +312,6 @@ struct WorkspaceRow: View {
           Text("no repos on disk")
             .font(.caption)
             .foregroundStyle(.tertiary)
-        }
-
-        if !workspace.members.isEmpty {
-          HStack(spacing: 7) {
-            HStack(spacing: 3) {
-              ForEach(workspace.members) { member in
-                RepoSwatch(repo: member.repoName, size: 7)
-              }
-            }
-            if summary.dirtyCount > 0 {
-              // Uncommitted work is what makes a workspace unsafe to remove, so it is
-              // worth a count rather than a mark per repo.
-              Label("\(summary.dirtyCount)", systemImage: "pencil")
-                .font(.caption2)
-                .foregroundStyle(Theme.warning)
-            }
-            if summary.failedCount > 0 {
-              Label("\(summary.failedCount)", systemImage: "exclamationmark.triangle.fill")
-                .font(.caption2)
-                .foregroundStyle(Theme.danger)
-            }
-            Spacer(minLength: 0)
-          }
         }
 
         // Only the repos that are not on the workspace's branch. Everything else is
