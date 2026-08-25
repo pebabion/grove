@@ -50,9 +50,14 @@ struct TerminalPane: View {
     // The strip belongs to the window, not to the terminal: the terminal keeps its own
     // background, which is a separate setting and deliberately neutral.
     .background(Theme.surface)
-    .task(id: sessions.isEmpty) {
-      // One session to begin with, in the workspace root. Starting from the body
-      // would resurrect a shell the moment it exited.
+    // One session to begin with, in the workspace root — and only as this pane appears.
+    //
+    // Keyed on `sessions.isEmpty` it also fired when the LAST session ended, so typing
+    // `exit` closed the shell and Grove immediately started another one, then hid the pane
+    // because the count had reached zero. The log said it plainly: "workspace exited on its
+    // own" followed at the same second by "watching progress reports". What was left was an
+    // invisible shell, alive and running, with a row in the sidebar nobody could explain.
+    .task {
       if sessions.isEmpty, !model.isCreating(workspace) {
         model.startSession(in: workspace, at: workspace.url)
       }

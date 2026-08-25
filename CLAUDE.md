@@ -787,3 +787,19 @@ rather than bold. What does need to be seen while working — how many are ready
 uncommitted work — lives in the summary bar, which stays when this list is collapsed. Dropped
 from the row along the way: the relative commit time, the words "uncommitted changes" (a
 pencil says it), and the branch on every row (only a repo that is somewhere else prints one).
+
+## Typing `exit` started another shell
+
+`TerminalPane` started its first session from `.task(id: sessions.isEmpty)`. That key also
+flips when the **last** session ends, so `exit` ran this sequence: the shell exits, the
+session is removed, the count reaches zero, the task fires and starts a fresh shell, and
+`onChange(of: sessions.count)` hides the pane. What was left was a live shell nobody could
+see, and a session row in the sidebar that looked like a ghost but was telling the truth.
+
+The log named it, at the same second: `workspace exited on its own` followed by `watching
+progress reports` — the second line is only ever written when a session starts. `pgrep -P
+<grove pid>` confirmed the orphan.
+
+`.task` without a key is what was meant: start one shell as the pane appears, and let a pane
+with nothing left in it close. **Any "start it if there is none" rule keyed on emptiness is a
+resurrection**, because emptiness is exactly what ending the last one produces.
