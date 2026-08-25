@@ -114,7 +114,6 @@ struct WorkspaceSummaryTests {
         ("frontend", "kelvin/thing", .ready, true),
       ]))
     #expect(summary.dirtyCount == 2)
-    #expect(summary.readyCount == 2)
     #expect(summary.failedCount == 1)
   }
 

@@ -27,14 +27,12 @@ public struct WorkspaceSummary: Sendable, Equatable {
   /// Repos with uncommitted work, which is what makes a workspace unsafe to remove.
   public let dirtyCount: Int
 
-  public let readyCount: Int
   public let failedCount: Int
 
   public init(_ workspace: Workspace) {
     let members = workspace.members
     repoCount = members.count
     dirtyCount = members.filter(\.hasUncommittedChanges).count
-    readyCount = members.filter { $0.state == .ready }.count
     failedCount = members.filter { $0.state == .failed }.count
 
     let branches = members.compactMap(\.branch).filter { !$0.isEmpty }

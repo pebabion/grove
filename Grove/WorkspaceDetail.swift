@@ -183,11 +183,13 @@ struct WorkspaceDetail: View {
         Spacer()
 
         // Collapsed, this bar was the whole workspace: a name and a branch. What someone
-        // wants from it is whether anything needs them, so the counts come up here.
+        // wants from it is whether anything needs them — so only the exceptions appear, and
+        // a workspace with nothing wrong says nothing.
+        //
+        // There is deliberately no "n of m ready": `ready` means Grove ran setup, and
+        // everything adopted from disk is `unknown`, so a perfectly healthy workspace
+        // reported "0 of 3 ready".
         let summary = WorkspaceSummary(workspace)
-        if summary.repoCount > 0 {
-          chip("\(summary.readyCount) of \(summary.repoCount) ready", tint: Theme.confirm)
-        }
         if summary.dirtyCount > 0 {
           chip("\(summary.dirtyCount) uncommitted", tint: Theme.warning, symbol: "pencil")
         }
@@ -285,7 +287,7 @@ struct WorkspaceDetail: View {
         if divergent, let branch = member.branch {
           Text(branch)
             .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(Theme.warning)
+            .foregroundStyle(.tertiary)
             .lineLimit(1)
             .truncationMode(.head)
         }

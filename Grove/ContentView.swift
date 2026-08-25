@@ -305,9 +305,6 @@ struct WorkspaceRow: View {
                 RepoSwatch(repo: member.repoName, size: 7)
               }
             }
-            Text("\(summary.repoCount) \(summary.repoCount == 1 ? "repo" : "repos")")
-              .font(.caption)
-              .foregroundStyle(.tertiary)
             if summary.dirtyCount > 0 {
               // Uncommitted work is what makes a workspace unsafe to remove, so it is
               // worth a count rather than a mark per repo.
@@ -334,9 +331,12 @@ struct WorkspaceRow: View {
               .foregroundStyle(.secondary)
               .fixedSize()
             // Branches share long prefixes, so keep the distinctive tail.
+            // Not warning-coloured. That a repo is somewhere else is said by the line
+            // existing at all, and a column of yellow made every workspace look alarming
+            // when most of them were fine.
             Text(member.branch ?? "detached")
               .font(.system(.caption2, design: .monospaced))
-              .foregroundStyle(Theme.warning)
+              .foregroundStyle(.tertiary)
               .lineLimit(1)
               .truncationMode(.head)
           }

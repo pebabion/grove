@@ -751,14 +751,19 @@ which is exactly what should be visible. A workspace adopted from disk has nothi
 so the repos' own agreement stands in, and when they agree on nothing every one gets a line —
 there is nothing to say once.
 
-The rest of the row is counts rather than marks: repo swatches with `N repos`, a count of
-uncommitted repos, a count of failed ones. **A session waiting for a human gets a bar down
+The rest of the row is marks, not words: the repo swatches say how many there are, and a
+count appears only for uncommitted or failed repos. A written "3 repos" was tried and read as
+a bug — the list under it shows only the exceptions, so the number contradicted the two lines
+below it. And a divergent branch is **not** warning-coloured: that a repo is somewhere else is
+said by the line existing at all, and a column of yellow made every workspace look alarming
+when most were fine. **A session waiting for a human gets a bar down
 the left of the row**, because a dot on a session line three lines down cannot be found while
 scanning a column.
 
-The detail pane's summary bar carries the same counts. Collapsed, that bar was the entire
-workspace — a name and a branch — and what someone wants from it is whether anything needs
-them.
+The detail pane's summary bar carries the same counts, and only the exceptions: a workspace
+with nothing wrong says nothing. **Never count `ready` there.** `ready` means Grove ran setup,
+and everything adopted from disk is `unknown`, so a chip reading "n of m ready" reported
+"0 of 3 ready" for a workspace whose three repos were all fine.
 
 Empty screens name the state and offer the action: "Point Grove at a clone" with what a
 workspace *is*, since that screen is where someone learns it, and the shortcut sits beside
