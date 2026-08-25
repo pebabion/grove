@@ -764,3 +764,11 @@ Empty screens name the state and offer the action: "Point Grove at a clone" with
 workspace *is*, since that screen is where someone learns it, and the shortcut sits beside
 the button rather than instead of it. "Press ⌘ N to create one" was the only thing the old
 one said, and it cannot be clicked.
+
+**The repo list is reference furniture.** It says which repos are here and it is where one is
+added or dropped; nobody reads it while working. So it does not compete: no heading, no card,
+one line each, hairlines instead of a filled panel, and the repo's name in the secondary tier
+rather than bold. What does need to be seen while working — how many are ready, what has
+uncommitted work — lives in the summary bar, which stays when this list is collapsed. Dropped
+from the row along the way: the relative commit time, the words "uncommitted changes" (a
+pencil says it), and the branch on every row (only a repo that is somewhere else prints one).

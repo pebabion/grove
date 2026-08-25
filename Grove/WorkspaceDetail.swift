@@ -60,8 +60,10 @@ struct WorkspaceDetail: View {
       } else if showingDetails {
         ScrollView {
           VStack(alignment: .leading, spacing: 20) {
-            repoList
-            addRepoSection
+            VStack(alignment: .leading, spacing: 6) {
+              repoList
+              addRepoSection
+            }
             // Part of the page rather than floating in whatever space was left over,
             // which put it adrift in the lower third of the window.
             if !showingTerminal {
@@ -234,20 +236,21 @@ struct WorkspaceDetail: View {
     .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
   }
 
+  /// The repos this workspace holds, quietly.
+  ///
+  /// Reference furniture: it says which repos are here and it is where one is added or
+  /// dropped. Nobody reads it while working, so it does not compete — no heading, no card,
+  /// one line each, and hairlines rather than a filled panel. What does need to be seen
+  /// while working — how many are ready, what has uncommitted work — is in the summary bar
+  /// above, which stays on screen when this list is collapsed.
   private var repoList: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text("Repos")
-        .font(.headline)
-
-      VStack(spacing: 0) {
-        ForEach(workspace.members) { member in
-          memberRow(member)
-          if member.id != workspace.members.last?.id {
-            Divider()
-          }
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(workspace.members) { member in
+        memberRow(member)
+        if member.id != workspace.members.last?.id {
+          Divider().overlay(Theme.divider.opacity(0.6))
         }
       }
-      .grovePanel()
     }
   }
 
@@ -256,45 +259,49 @@ struct WorkspaceDetail: View {
     let state = activity?.state ?? member.state
     let logKey = member.repoName
 
-    return VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 10) {
-        StateBadge(state: state, busy: state == .settingUp)
-        RepoSwatch(repo: member.repoName, size: 10)
+    // Only the repos that are not on the workspace's branch say which branch they are on.
+    // The same rule as the sidebar: the shared branch is in the bar above, and printing it
+    // once per row is what made this section shout.
+    let divergent = WorkspaceSummary(workspace).divergent.contains {
+      $0.repoName == member.repoName
+    }
 
-        VStack(alignment: .leading, spacing: 2) {
-          Text(member.repoName)
-            .fontWeight(.medium)
-          HStack(spacing: 6) {
-            if let branch = member.branch {
-              Text(branch)
-                .font(.system(.caption, design: .monospaced))
-            }
-            if member.hasUncommittedChanges {
-              Text("· uncommitted changes")
-                .font(.caption)
-                .foregroundStyle(Theme.warning)
-            }
-            if let detail = activity?.detail, state == .settingUp || state == .failed {
-              Text("· \(detail)")
-                .font(.caption)
-                .foregroundStyle(state == .failed ? Theme.danger : Theme.detail)
-            }
-          }
+    return VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 8) {
+        StateBadge(state: state, busy: state == .settingUp)
+        RepoSwatch(repo: member.repoName, size: 8)
+
+        Text(member.repoName)
+          .font(.callout)
           .foregroundStyle(.secondary)
+
+        if member.hasUncommittedChanges {
+          Image(systemName: "pencil")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(Theme.warning)
+            .help("Uncommitted changes")
         }
 
-        Spacer()
+        if divergent, let branch = member.branch {
+          Text(branch)
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(Theme.warning)
+            .lineLimit(1)
+            .truncationMode(.head)
+        }
+
+        // Setup steps and failures are the one thing here worth interrupting for.
+        if let detail = activity?.detail, state == .settingUp || state == .failed {
+          Text(detail)
+            .font(.caption)
+            .foregroundStyle(state == .failed ? Theme.danger : Theme.detail)
+            .lineLimit(1)
+        }
+
+        Spacer(minLength: 8)
 
         if let reading = model.pullRequest(for: member) {
           PullRequestBadge(reading: reading)
-        } else if model.isLoadingPullRequests {
-          ProgressView().controlSize(.small)
-        }
-
-        if let commit = member.lastCommit {
-          Text(commit, format: .relative(presentation: .numeric, unitsStyle: .narrow))
-            .font(.caption)
-            .foregroundStyle(.tertiary)
         }
 
         if activity?.log != nil {
@@ -350,7 +357,8 @@ struct WorkspaceDetail: View {
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.divider))
       }
     }
-    .padding(12)
+    .padding(.horizontal, 4)
+    .padding(.vertical, 7)
   }
 
   private var addRepoSection: some View {
@@ -368,9 +376,16 @@ struct WorkspaceDetail: View {
             }
           }
         } label: {
-          Text("Add Repo")
+          HStack(spacing: 4) {
+            Image(systemName: "plus")
+              .font(.system(size: 9, weight: .semibold))
+            Text("Add a repo")
+              .font(.caption)
+          }
+          .foregroundStyle(.tertiary)
         }
-        .menuStyle(.button)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
         .disabled(model.isBusy)
       }
