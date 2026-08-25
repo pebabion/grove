@@ -314,24 +314,30 @@ struct WorkspaceRow: View {
             .foregroundStyle(.tertiary)
         }
 
-        // Only the repos that are not on the workspace's branch. Everything else is
-        // covered by the line above, and printing it again is what made rows unreadable.
-        ForEach(summary.divergent) { member in
+        // Every repo is named, and only the ones that are somewhere else carry a branch.
+        //
+        // Listing just the exceptions was tried and misread, reasonably: a row showing one
+        // repo out of three looks like a workspace with one repo in it. The names say what
+        // is in here; the branch is the thing worth saying once.
+        ForEach(workspace.members) { member in
+          let elsewhere = summary.divergent.contains { $0.repoName == member.repoName }
           HStack(spacing: 5) {
             RepoSwatch(repo: member.repoName, size: 7)
             Text(member.repoName)
               .font(.caption)
               .foregroundStyle(.secondary)
               .fixedSize()
-            // Branches share long prefixes, so keep the distinctive tail.
-            // Not warning-coloured. That a repo is somewhere else is said by the line
-            // existing at all, and a column of yellow made every workspace look alarming
-            // when most of them were fine.
-            Text(member.branch ?? "detached")
-              .font(.system(.caption2, design: .monospaced))
-              .foregroundStyle(.tertiary)
-              .lineLimit(1)
-              .truncationMode(.head)
+            if elsewhere {
+              // Branches share long prefixes, so keep the distinctive tail. Not
+              // warning-coloured: that a repo is somewhere else is said by the branch being
+              // there at all, and a column of yellow made every workspace look alarming.
+              Text(member.branch ?? "detached")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.head)
+            }
+            Spacer(minLength: 0)
           }
         }
 
