@@ -149,6 +149,57 @@ struct RenameTests {
       _ = try await service.rename(workspace: workspace, to: "   ", root: root, library: library)
     }
   }
+
+  @Test("it says which step it is on, and the bar only goes forward")
+  func reportsItsSteps() async throws {
+    // A rename moves a folder and then repairs a worktree per repo — seconds of git with
+    // nothing on screen unless it says so. Reported badly it is worse than silence, so the
+    // shape of the report is asserted the way a teardown's is.
+    let sandbox = try Sandbox()
+    let root = sandbox.root.appending(path: "spaces")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let frontend = try await sandbox.makeRepository(named: "frontend")
+    let backend = try await sandbox.makeRepository(named: "backend")
+    let library = RepoLibrary(
+      repos: [
+        RepoEntry(name: "frontend", path: frontend.path, base: "main"),
+        RepoEntry(name: "backend", path: backend.path, base: "main"),
+      ],
+      workspaceRoot: root.path
+    )
+
+    let service = WorkspaceService(git: git, toolPaths: toolPaths)
+    _ = try await service.create(
+      name: "First Try", branch: "kelvin/first-try", link: nil, repos: library.repos,
+      in: root, onUpdate: { _ in })
+    let before = await WorkspaceScanner(git: git).scan(root: root, library: library)
+    let workspace = try #require(before.first)
+
+    let steps = Steps()
+    _ = try await service.rename(
+      workspace: workspace, to: "Second Try", root: root, library: library,
+      onPhase: { steps.add($0) })
+
+    let labels = steps.labels
+    #expect(labels.contains("Moving the folder"))
+    #expect(labels.contains { $0.hasPrefix("Repairing ") })
+    // One per repo, so the bar keeps moving through the part that takes the time.
+    #expect(labels.filter { $0.hasPrefix("Repairing ") }.count == 2)
+    let fractions = steps.fractions
+    #expect(fractions == fractions.sorted(), "\(fractions)")
+    #expect(fractions.allSatisfy { $0 >= 0 && $0 <= 1 })
+    withExtendedLifetime(sandbox) {}
+  }
+
+  /// Collects what arrives from another task without racing.
+  private final class Steps: @unchecked Sendable {
+    private let lock = NSLock()
+    private var outlines: [WorkOutline] = []
+    func add(_ outline: WorkOutline) { lock.withLock { outlines.append(outline) } }
+    var labels: [String] { lock.withLock { outlines.map(\.label) } }
+    var fractions: [Double] { lock.withLock { outlines.map(\.fraction) } }
+  }
 }
 
 /// Everything Grove remembers about a workspace — the terminal it has open, the files pane,

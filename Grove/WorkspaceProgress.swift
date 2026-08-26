@@ -14,13 +14,19 @@ struct WorkspaceProgress: View {
   enum Job {
     case creating
     case removing
+    case renaming
 
     var title: String {
       switch self {
       case .creating: "Setting up"
       case .removing: "Removing"
+      case .renaming: "Renaming"
       }
     }
+
+    /// Whether a row per repo says anything. A rename does the same thing to each repo —
+    /// repair its worktree — so a list of them would be three lines of the same word.
+    var listsRepos: Bool { self != .renaming }
   }
 
   private var members: [WorkspaceMember] { workspace.members }
@@ -34,6 +40,8 @@ struct WorkspaceProgress: View {
     switch job {
     case .creating: state == .ready || state == .failed
     case .removing: state == .removed
+    // Renaming does not count repos: it lists none, and its bar comes from the service.
+    case .renaming: false
     }
   }
 
@@ -47,14 +55,16 @@ struct WorkspaceProgress: View {
           .foregroundStyle(.secondary)
       }
 
-      VStack(spacing: 0) {
-        ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
-          if index > 0 { Divider() }
-          row(for: member)
+      if job.listsRepos {
+        VStack(spacing: 0) {
+          ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
+            if index > 0 { Divider() }
+            row(for: member)
+          }
         }
+        .grovePanel()
+        .frame(maxWidth: 520)
       }
-      .grovePanel()
-      .frame(maxWidth: 520)
 
       footer
     }
@@ -79,14 +89,14 @@ struct WorkspaceProgress: View {
       )
       .font(.caption)
       .foregroundStyle(.secondary)
-    case .removing:
+    case .removing, .renaming:
       VStack(spacing: 8) {
         ProgressView(value: model.busyFraction ?? 0)
           .progressViewStyle(.linear)
           .frame(maxWidth: 320)
         // The step the whole workspace is on, which the rows cannot say: the folder
         // itself goes after the last repo, and it is the slowest part.
-        Text(model.busyLabel ?? "Removing")
+        Text(model.busyLabel ?? job.title)
           .font(.caption)
           .foregroundStyle(.secondary)
           .lineLimit(1)

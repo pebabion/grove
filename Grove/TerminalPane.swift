@@ -24,9 +24,7 @@ struct TerminalPane: View {
 
   private var sessions: [TerminalSession] { model.terminals.sessions(in: workspace.url) }
 
-  private var current: TerminalSession? {
-    model.activeSession(in: workspace) ?? sessions.first
-  }
+  private var current: TerminalSession? { model.activeSession(in: workspace) }
 
   private var filesShowing: Bool { model.fileWorkspaces.contains(workspace.url) }
 

@@ -91,6 +91,15 @@ final class AppModel {
     removingWorkspaces.contains(workspace.url)
   }
 
+  /// Workspaces being renamed. A rename moves the folder and then repairs a worktree per
+  /// repo — seconds of git, and before this it happened behind a closed sheet with nothing
+  /// on screen to say so.
+  private(set) var renamingWorkspaces: Set<URL> = []
+
+  func isRenaming(_ workspace: Workspace) -> Bool {
+    renamingWorkspaces.contains(workspace.url)
+  }
+
   /// How tall the terminal pane is when it shares the window with the repo list.
   /// Dragged by the divider between them, and kept for the same reason the rest of
   /// this is: switching workspaces should not reset it.
@@ -116,10 +125,18 @@ final class AppModel {
     return terminals.sessions(in: workspace.url).isEmpty ? "Start Session" : "Hide Terminal"
   }
 
-  /// The session a workspace is showing, if it still exists.
+  /// The session a workspace is showing.
+  ///
+  /// Falls back to the first live one, because `activeSessions` goes stale: closing a
+  /// session or a shell exiting removes it from the store and leaves this map pointing at
+  /// an id that no longer exists. The terminal pane worked around that with a fallback of
+  /// its own, so a terminal stayed on screen — but `closableSession` did not, so ⌘ W found
+  /// no session and closed the whole window with a terminal plainly in front of you.
   func activeSession(in workspace: Workspace) -> TerminalSession? {
-    guard let id = activeSessions[workspace.url] else { return nil }
-    return terminals.session(id: id)
+    if let id = activeSessions[workspace.url], let live = terminals.session(id: id) {
+      return live
+    }
+    return terminals.sessions(in: workspace.url).first
   }
 
   func selectSession(_ session: TerminalSession) {
@@ -339,7 +356,15 @@ final class AppModel {
       NSApp.keyWindow?.performClose(nil)
       return
     }
+    let workspace = session.workspace
     terminals.close(id: session.id)
+    // Point at what is left rather than at what was just closed, so the next ⌘ W has a
+    // session to find and the tab strip highlights the right one.
+    if let next = terminals.sessions(in: workspace).first {
+      activeSessions[workspace] = next.id
+    } else {
+      activeSessions.removeValue(forKey: workspace)
+    }
   }
 
   /// Starts another session, beside the one already running.
@@ -540,6 +565,15 @@ final class AppModel {
     }
     isScanning = false
     lastScan = Date()
+
+    // Everything keyed on a workspace URL: drop what no longer exists. A removed or
+    // renamed workspace otherwise leaves its entries behind for the rest of the run, and
+    // `activeSessions` pointing at a workspace that is gone is how ⌘ W lost track of which
+    // session it meant.
+    let live = Set(workspaces.map(\.url))
+    terminalWorkspaces.formIntersection(live)
+    fileWorkspaces.formIntersection(live)
+    activeSessions = activeSessions.filter { live.contains($0.key) }
     // The set of things worth watching changes with the set of workspaces.
     watchDisk()
     // A workspace that has just appeared should not wait for the next half-hourly sweep
@@ -774,7 +808,11 @@ final class AppModel {
     }
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     isBusy = true
-    defer { isBusy = false }
+    busyLabel = "Running setup for \(member.repoName)"
+    defer {
+      isBusy = false
+      busyLabel = nil
+    }
     await service.runSetup(
       for: repo,
       workspace: workspace.url,
@@ -788,7 +826,15 @@ final class AppModel {
     guard let git else { return }
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     isBusy = true
-    defer { isBusy = false }
+    renamingWorkspaces.insert(workspace.url)
+    busyLabel = "Renaming \(workspace.name)"
+    busyFraction = 0
+    defer {
+      isBusy = false
+      busyLabel = nil
+      busyFraction = nil
+      renamingWorkspaces.remove(workspace.url)
+    }
     do {
       // The folder is about to move. A shell inside it would be left with a
       // working directory that no longer exists.
@@ -800,7 +846,13 @@ final class AppModel {
         workspace: workspace,
         to: newName,
         root: library.workspaceRootURL,
-        library: library
+        library: library,
+        onPhase: { outline in
+          Task { @MainActor [weak self] in
+            self?.busyLabel = outline.label
+            self?.busyFraction = outline.fraction
+          }
+        }
       )
       await rescan()
       selection = workspaces.first { $0.url.canonical == moved.canonical }?.url
@@ -822,7 +874,11 @@ final class AppModel {
     guard let git else { return }
     let service = WorkspaceService(git: git, toolPaths: toolPaths)
     isBusy = true
-    defer { isBusy = false }
+    busyLabel = "Removing \(member.repoName) from \(workspace.name)"
+    defer {
+      isBusy = false
+      busyLabel = nil
+    }
     // A shell sitting in a directory that is about to go would be left with a
     // deleted working directory, and whatever it launched still running.
     terminals.closeAll(under: member.url)

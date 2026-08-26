@@ -53,6 +53,8 @@ struct WorkspaceDetail: View {
         WorkspaceProgress(workspace: workspace, job: .creating)
       } else if model.isRemoving(workspace) {
         WorkspaceProgress(workspace: workspace, job: .removing)
+      } else if model.isRenaming(workspace) {
+        WorkspaceProgress(workspace: workspace, job: .renaming)
       } else if showingFiles {
         // Files take the place of the repo list rather than sitting over the window:
         // reading one is something you do while working, not instead of it.

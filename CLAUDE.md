@@ -803,3 +803,48 @@ progress reports` — the second line is only ever written when a session starts
 `.task` without a key is what was meant: start one shell as the pane appears, and let a pane
 with nothing left in it close. **Any "start it if there is none" rule keyed on emptiness is a
 resurrection**, because emptiness is exactly what ending the last one produces.
+
+## ⌘ W closed the window with a terminal in front of you
+
+`activeSessions` maps a workspace to the session it is showing, and **nothing cleared it
+when a session ended**. Closing one left the map pointing at an id that was gone, so
+`activeSession(in:)` returned nil. The terminal pane had papered over that with its own
+`?? sessions.first`, so a terminal stayed on screen — but `closableSession` had no such
+fallback, found nothing to close, and fell through to closing the window.
+
+The fallback belongs in the model, not in one view: `activeSession(in:)` returns the first
+live session when the map is stale, `closeSessionOrWindow` repoints the map at what is left,
+and a rescan drops every entry — `activeSessions`, `terminalWorkspaces`, `fileWorkspaces` —
+whose workspace no longer exists.
+
+Worth knowing for the next one of these: the File menu was never the problem. Dumping
+`NSApp.mainMenu` showed Grove's own item first with ⌘ W, the system's "Close" carrying no
+key at all, and "Close All" below it. When a menu command does the wrong thing, dump the
+menu before theorising about ordering.
+
+## A scan was serial, and everything waits on one
+
+Every create, rename, add and removal ends with a rescan, so the scan's cost is the pause
+after every operation. It asked git four questions per worktree — the clone, the branch, the
+last commit, whether anything is uncommitted — one worktree at a time, one workspace at a
+time. Eighteen worktrees meant seventy-odd git processes in a queue.
+
+Measured on a real root, same machine, same data: **2.0s serial, 0.57s parallel.** Workspaces
+scan together, worktrees within a workspace scan together, and the three questions per
+worktree are three `async let`s.
+
+**This is not the lock the other rule is about.** `git worktree add` takes a lock on the
+source clone and stays serial. These are read-only queries in separate worktrees: each has
+its own index, and the clone they share is only read.
+
+Two details that keep it deterministic: the child directories are sorted before the group is
+launched, because a task group finishes in whatever order it likes and the tie-break for two
+same-named repos would otherwise change from scan to scan; and the results are reassembled by
+index rather than by arrival.
+
+## Say what the slow thing is
+
+Every operation that sets `isBusy` names itself in `busyLabel`. Rename reports each step
+through `onPhase` — moving the folder, then repairing a worktree per repo — and shows it in
+the pane like creating and removing do, because it moves a folder and runs a git call per
+repo and used to do all of that behind a closed sheet with nothing on screen.

@@ -259,11 +259,15 @@ public struct WorkspaceService: Sendable {
   /// The move is the whole difficulty. Each worktree's `.git` file points into
   /// its clone and the clone points back at the old path, so a plain `mv` leaves
   /// every repo in the workspace broken until `git worktree repair` runs.
+  /// `onPhase` says which step is running. A rename moves a folder and then repairs a
+  /// worktree per repo, which takes seconds — long enough that saying nothing reads as
+  /// nothing happening.
   public func rename(
     workspace: Workspace,
     to newName: String,
     root: URL,
-    library: RepoLibrary
+    library: RepoLibrary,
+    onPhase: @escaping @Sendable (WorkOutline) -> Void = { _ in }
   ) async throws -> URL {
     let slug = WorkspaceNaming.slug(newName)
     guard !slug.isEmpty else { throw WorkspaceError.emptyName }
@@ -283,6 +287,7 @@ public struct WorkspaceService: Sendable {
       guard !FileManager.default.fileExists(atPath: destination.path) else {
         throw WorkspaceError.nameTaken(slug)
       }
+      onPhase(WorkOutline(label: "Moving the folder", fraction: 0.05))
       try FileManager.default.moveItem(at: current, to: destination)
 
       // Find the moved worktrees by looking at where they now are, rather than
@@ -290,7 +295,14 @@ public struct WorkspaceService: Sendable {
       // its clone correctly — only the clone's record of the worktree is stale —
       // so each one can point the way back to the repo that needs repairing.
       var complaints: [String] = []
-      for worktree in Self.worktreeDirectories(in: destination) {
+      // One step per repo, over the nine tenths of the bar the repairs are worth: this is
+      // the part that takes the time, because each one is a git call of its own.
+      let worktrees = Self.worktreeDirectories(in: destination)
+      for (index, worktree) in worktrees.enumerated() {
+        onPhase(
+          WorkOutline(
+            label: "Repairing \(worktree.lastPathComponent)",
+            fraction: 0.1 + 0.8 * (Double(index) / Double(max(worktrees.count, 1)))))
         guard let clone = try await git.sourceClone(of: worktree) else { continue }
         if let complaint = try await git.repairWorktree(repo: clone, at: worktree) {
           complaints.append("\(worktree.lastPathComponent): \(complaint)")

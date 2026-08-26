@@ -106,20 +106,34 @@ public struct WorkspaceScanner: Sendable {
 
     // Map every library repo's clone path to its name once, so each worktree
     // can be attributed by its shared .git directory.
-    var repoByClone: [String: String] = [:]
-    for repo in library.repos {
-      repoByClone[repo.url.standardizedFileURL.path] = repo.name
+    // A `let`, because a task group refuses to capture a mutable one — and it has no
+    // business changing once the scan starts anyway.
+    let repoByClone = library.repos.reduce(into: [String: String]()) { table, repo in
+      table[repo.url.standardizedFileURL.path] = repo.name
     }
 
-    var workspaces: [Workspace] = []
-    for entry in entries {
-      let isDirectory =
-        (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-      guard isDirectory else { continue }
-      if let workspace = await inspect(entry, repoByClone: repoByClone) {
-        workspaces.append(workspace)
-      }
+    let directories = entries.filter {
+      (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
     }
+
+    // Every workspace at once. Each one asks git four questions per worktree, and asking
+    // them in a queue is what made a scan of nineteen worktrees take five seconds — which
+    // every create, rename, add and removal waits on before it looks finished.
+    //
+    // Read-only git calls in separate worktrees do not contend: each has its own index,
+    // and the clone they share is only read. This is not the worktree lock the rules
+    // elsewhere are about — that one belongs to `git worktree add`, which is still serial.
+    let workspaces = await withTaskGroup(of: Workspace?.self) { group in
+      for entry in directories {
+        group.addTask { [self] in await inspect(entry, repoByClone: repoByClone) }
+      }
+      var found: [Workspace] = []
+      for await workspace in group {
+        if let workspace { found.append(workspace) }
+      }
+      return found
+    }
+
     return workspaces.sorted {
       $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
     }
@@ -139,16 +153,31 @@ public struct WorkspaceScanner: Sendable {
         options: [.skipsHiddenFiles]
       )) ?? []
 
-    for child in children {
-      let isDirectory =
-        (try? child.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-      guard isDirectory else { continue }
-      guard var member = await member(at: child, repoByClone: repoByClone) else { continue }
+    let childDirectories =
+      children
+      .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false }
+      // Sorted, so the tie-break below is the same on every scan: a task group finishes in
+      // whatever order it likes, and which of two same-named repos keeps the name would
+      // otherwise change from one scan to the next.
+      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+    let found = await withTaskGroup(of: (Int, WorkspaceMember?).self) { group in
+      for (index, child) in childDirectories.enumerated() {
+        group.addTask { [self] in (index, await member(at: child, repoByClone: repoByClone)) }
+      }
+      var byIndex: [Int: WorkspaceMember] = [:]
+      for await (index, member) in group {
+        if let member { byIndex[index] = member }
+      }
+      return childDirectories.indices.compactMap { byIndex[$0] }
+    }
+
+    for var member in found {
       // Two worktrees of one repo in the same workspace would collide on name,
       // and a duplicate id breaks the list that renders them. Directory name
       // breaks the tie.
       if members.contains(where: { $0.repoName == member.repoName }) {
-        member.repoName = child.lastPathComponent
+        member.repoName = member.url.lastPathComponent
       }
       members.append(member)
     }
@@ -198,13 +227,18 @@ public struct WorkspaceScanner: Sendable {
     let clonePath = clone.standardizedFileURL.path
     let repoName = repoByClone[clonePath] ?? clone.lastPathComponent
 
-    return WorkspaceMember(
+    // Three independent questions, so three git processes at once rather than in turn.
+    async let branch = try? await git.currentBranch(worktree: url)
+    async let commit = try? await git.lastCommitDate(worktree: url)
+    async let dirty = (try? await git.hasUncommittedChanges(worktree: url)) ?? false
+
+    return await WorkspaceMember(
       repoName: repoName,
       url: url.identity,
-      branch: try? await git.currentBranch(worktree: url),
+      branch: branch,
       state: .unknown,
-      lastCommit: try? await git.lastCommitDate(worktree: url),
-      hasUncommittedChanges: (try? await git.hasUncommittedChanges(worktree: url)) ?? false
+      lastCommit: commit,
+      hasUncommittedChanges: dirty
     )
   }
 
